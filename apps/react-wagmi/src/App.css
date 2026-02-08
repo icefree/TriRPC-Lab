@@ -231,8 +231,39 @@
   gap: 8px;
 }
 
-.rpc-float-tools h3 {
+.rpc-float-tools.collapsed {
+  gap: 0;
+}
+
+.rpc-tools-toggle {
+  width: 100%;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rpc-tools-toggle h3 {
   margin: 0;
+  font-size: 15px;
+}
+
+.rpc-tools-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.rpc-tools-panel {
+  display: grid;
+  gap: 8px;
 }
 
 .rpc-tool-note {

@@ -595,6 +595,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
   const [toolDecimals, setToolDecimals] = useState('18')
   const [toolResult, setToolResult] = useState('')
   const [toolError, setToolError] = useState('')
+  const [isQuickToolsOpen, setIsQuickToolsOpen] = useState(true)
   const wagmiPublicClient = usePublicClient()
   const { data: wagmiWalletClient } = useWalletClient()
   const category = RPC_REFERENCE[activeCategory]
@@ -1592,56 +1593,71 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         </div>
       </div>
 
-      <aside className="rpc-float-tools" aria-label="quick-tools">
-        <h3>{tr(lang, 'Quick Utilities', '快捷工具')}</h3>
-        <p className="rpc-tool-note">
-          {tr(
-            lang,
-            'Convert values quickly. You can paste output and run helper transforms.',
-            '快速转换执行结果，可粘贴结果并执行辅助转换。',
-          )}
-        </p>
-        <textarea
-          className="rpc-tool-input"
-          placeholder={tr(lang, 'Input (hex / wei / decimal)', '输入值（hex / wei / 十进制）')}
-          value={toolInput}
-          onChange={(event) => setToolInput(event.target.value)}
-        />
-        <div className="rpc-tool-inline">
-          <label>
-            {tr(lang, 'Decimals', 'Decimals')}
-            <input
-              className="rpc-tool-decimals"
-              value={toolDecimals}
-              onChange={(event) => setToolDecimals(event.target.value)}
+      <aside className={`rpc-float-tools ${isQuickToolsOpen ? '' : 'collapsed'}`} aria-label="quick-tools">
+        <button
+          type="button"
+          className="rpc-tools-toggle"
+          aria-expanded={isQuickToolsOpen}
+          aria-controls="quick-tools-panel"
+          onClick={() => setIsQuickToolsOpen((prev) => !prev)}
+        >
+          <h3>{tr(lang, 'Quick Utilities', '快捷工具')}</h3>
+          <span className="rpc-tools-toggle-icon" aria-hidden="true">
+            {isQuickToolsOpen ? '−' : '+'}
+          </span>
+        </button>
+        {isQuickToolsOpen && (
+          <div id="quick-tools-panel" className="rpc-tools-panel">
+            <p className="rpc-tool-note">
+              {tr(
+                lang,
+                'Convert values quickly. You can paste output and run helper transforms.',
+                '快速转换执行结果，可粘贴结果并执行辅助转换。',
+              )}
+            </p>
+            <textarea
+              className="rpc-tool-input"
+              placeholder={tr(lang, 'Input (hex / wei / decimal)', '输入值（hex / wei / 十进制）')}
+              value={toolInput}
+              onChange={(event) => setToolInput(event.target.value)}
             />
-          </label>
-          <button onClick={fillToolInputFromLatestResult} disabled={!latestResultText}>
-            {tr(lang, 'Use Last Result', '使用最近结果')}
-          </button>
-        </div>
-        <div className="rpc-tool-actions">
-          <button onClick={() => runQuickTool('hexToInteger')}>{tr(lang, 'Hex -> Integer', '16进制 -> 整数')}</button>
-          <button onClick={() => runQuickTool('parseEther')}>parseEther</button>
-          <button onClick={() => runQuickTool('formatEther')}>formatEther</button>
-          <button onClick={() => runQuickTool('parseUnits')}>parseUnits</button>
-          <button onClick={() => runQuickTool('formatUnits')}>formatUnits</button>
-        </div>
-        {toolResult && (
-          <div className="rpc-output-wrap">
-            <button
-              className="rpc-copy-btn"
-              onClick={() => void copyText(toolResult, 'tool::result')}
-            >
-              {copiedOutputKey === 'tool::result'
-                ? tr(lang, 'Copied', '已复制')
-                : tr(lang, 'Copy', '复制')}
-            </button>
-            <pre className="rpc-output success">{toolResult}</pre>
+            <div className="rpc-tool-inline">
+              <label>
+                {tr(lang, 'Decimals', 'Decimals')}
+                <input
+                  className="rpc-tool-decimals"
+                  value={toolDecimals}
+                  onChange={(event) => setToolDecimals(event.target.value)}
+                />
+              </label>
+              <button onClick={fillToolInputFromLatestResult} disabled={!latestResultText}>
+                {tr(lang, 'Use Last Result', '使用最近结果')}
+              </button>
+            </div>
+            <div className="rpc-tool-actions">
+              <button onClick={() => runQuickTool('hexToInteger')}>{tr(lang, 'Hex -> Integer', '16进制 -> 整数')}</button>
+              <button onClick={() => runQuickTool('parseEther')}>parseEther</button>
+              <button onClick={() => runQuickTool('formatEther')}>formatEther</button>
+              <button onClick={() => runQuickTool('parseUnits')}>parseUnits</button>
+              <button onClick={() => runQuickTool('formatUnits')}>formatUnits</button>
+            </div>
+            {toolResult && (
+              <div className="rpc-output-wrap">
+                <button
+                  className="rpc-copy-btn"
+                  onClick={() => void copyText(toolResult, 'tool::result')}
+                >
+                  {copiedOutputKey === 'tool::result'
+                    ? tr(lang, 'Copied', '已复制')
+                    : tr(lang, 'Copy', '复制')}
+                </button>
+                <pre className="rpc-output success">{toolResult}</pre>
+              </div>
+            )}
+            {toolError && <pre className="rpc-output error">{toolError}</pre>}
+            {copyError && <pre className="rpc-output error">{copyError}</pre>}
           </div>
         )}
-        {toolError && <pre className="rpc-output error">{toolError}</pre>}
-        {copyError && <pre className="rpc-output error">{copyError}</pre>}
       </aside>
 
     </section>
