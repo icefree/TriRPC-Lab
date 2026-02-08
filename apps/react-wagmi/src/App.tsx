@@ -1418,9 +1418,26 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (requiresAuthorization(method) && method !== 'eth_requestAccounts') {
         await ensureAuthorized(provider, mode)
       }
-      const code = buildRunnerCode(method, mode, getParamsValue(method))
+      const paramsText = getParamsValue(method)
+      const code = buildRunnerCode(method, mode, paramsText)
+      const mappingText =
+        mode === 'rpc'
+          ? `provider.request({ method: '${method}', params })`
+          : methodLibraryMapping(method)[mode]
+      console.info('[TriRPC] invoking method', {
+        mode,
+        method,
+        mapping: mappingText,
+        paramsText,
+      })
+      console.info(`[TriRPC] executable code (${mode}:${method})\n${code}`)
       const result = await executeRunnerCode(provider, mode, code)
       const resultText = formatRunnerResult(result)
+      console.info('[TriRPC] invoke result', {
+        mode,
+        method,
+        result: resultText,
+      })
 
       setInvokeEntry(method, mode, {
         loading: false,
@@ -1432,9 +1449,26 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (!requiresAuthorization(method) && method !== 'eth_requestAccounts' && isUnauthorizedError(error)) {
         try {
           await ensureAuthorized(provider, mode)
-          const code = buildRunnerCode(method, mode, getParamsValue(method))
+          const paramsText = getParamsValue(method)
+          const code = buildRunnerCode(method, mode, paramsText)
+          const mappingText =
+            mode === 'rpc'
+              ? `provider.request({ method: '${method}', params })`
+              : methodLibraryMapping(method)[mode]
+          console.info('[TriRPC] retry invoking method after authorization', {
+            mode,
+            method,
+            mapping: mappingText,
+            paramsText,
+          })
+          console.info(`[TriRPC] executable code (${mode}:${method})\n${code}`)
           const retryResult = await executeRunnerCode(provider, mode, code)
           const retryResultText = formatRunnerResult(retryResult)
+          console.info('[TriRPC] retry invoke result', {
+            mode,
+            method,
+            result: retryResultText,
+          })
           setInvokeEntry(method, mode, {
             loading: false,
             result: retryResultText,
@@ -1450,6 +1484,11 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       }
 
       const message = error instanceof Error ? error.message : String(error)
+      console.error('[TriRPC] invoke error', {
+        mode,
+        method,
+        error: message,
+      })
       setInvokeEntry(method, mode, { loading: false, result: undefined, error: message })
     }
   }
