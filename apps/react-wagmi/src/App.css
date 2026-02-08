@@ -120,6 +120,48 @@
   padding: 8px 10px;
 }
 
+.rpc-invoke {
+  display: grid;
+  gap: 6px;
+}
+
+.rpc-params {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.rpc-run-btn {
+  width: fit-content;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.rpc-output {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.rpc-output.success {
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.rpc-output.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
 .rpc-category {
   display: grid;
   gap: 8px;

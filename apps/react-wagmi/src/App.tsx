@@ -58,6 +58,13 @@ type RpcCategory = {
   methods: RpcMethod[]
 }
 
+type InvokeState = {
+  params: string
+  loading: boolean
+  result?: string
+  error?: string
+}
+
 const CODES: Record<'ethers' | 'viem' | 'wagmi', ActionCode> = {
   ethers: {
     connect: `const provider = new BrowserProvider(window.ethereum)\nawait provider.send('eth_requestAccounts', [])\nconst signer = await provider.getSigner()\nconst address = await signer.getAddress()`,
@@ -560,6 +567,7 @@ function methodLibraryMapping(method: string): { ethers: string; viem: string; w
 function RpcReferencePage({ lang }: { lang: Lang }) {
   const [activeCategory, setActiveCategory] = useState(0)
   const [query, setQuery] = useState('')
+  const [invokeMap, setInvokeMap] = useState<Record<string, InvokeState>>({})
   const category = RPC_REFERENCE[activeCategory]
   const normalizedQuery = query.trim().toLowerCase()
   const filteredMethods = category.methods.filter((item) => {
@@ -577,6 +585,87 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       .toLowerCase()
     return target.includes(normalizedQuery)
   })
+
+  const nonRpcPseudoMethods = new Set(['newHeads', 'logs', 'newPendingTransactions'])
+
+  const defaultParams = (method: string) => {
+    const samples: Record<string, string> = {
+      eth_getBalance: '["0x0000000000000000000000000000000000000000","latest"]',
+      eth_getTransactionCount: '["0x0000000000000000000000000000000000000000","latest"]',
+      eth_getCode: '["0x0000000000000000000000000000000000000000","latest"]',
+      eth_getStorageAt: '["0x0000000000000000000000000000000000000000","0x0","latest"]',
+      eth_getBlockByNumber: '["latest", false]',
+      eth_getBlockByHash: '["0x...", false]',
+      eth_getTransactionByHash: '["0x..."]',
+      eth_getTransactionReceipt: '["0x..."]',
+      eth_getLogs: '[{"fromBlock":"latest","toBlock":"latest"}]',
+      eth_call: '[{"to":"0x0000000000000000000000000000000000000000","data":"0x"},"latest"]',
+      eth_estimateGas: '[{"to":"0x0000000000000000000000000000000000000000","data":"0x"}]',
+      eth_feeHistory: '["0x5","latest",[]]',
+      eth_sendTransaction: '[{"to":"0x0000000000000000000000000000000000000000","value":"0x0"}]',
+      eth_sendRawTransaction: '["0x..."]',
+      personal_sign: '["0x68656c6c6f","0x0000000000000000000000000000000000000000"]',
+      eth_signTypedData_v4: '["0x0000000000000000000000000000000000000000","{\\"types\\":{},\\"primaryType\\":\\"EIP712Domain\\",\\"domain\\":{},\\"message\\":{}}"]',
+      wallet_switchEthereumChain: '[{"chainId":"0x1"}]',
+      wallet_addEthereumChain: '[{"chainId":"0x1","chainName":"Ethereum Mainnet","rpcUrls":["https://..."]}]',
+      wallet_watchAsset: '[{"type":"ERC20","options":{"address":"0x...","symbol":"TKN","decimals":18}}]',
+      wallet_requestPermissions: '[{"eth_accounts":{}}]',
+      wallet_revokePermissions: '[{"eth_accounts":{}}]',
+      wallet_getCapabilities: '["0x0000000000000000000000000000000000000000"]',
+      wallet_sendCalls: '[{"version":"1.0","chainId":"0x1","calls":[]}]',
+      wallet_getCallsStatus: '["0x..."]',
+      debug_traceTransaction: '["0x...", {}]',
+    }
+    return samples[method] ?? '[]'
+  }
+
+  const getInvokeEntry = (method: string): InvokeState => {
+    return invokeMap[method] ?? { params: defaultParams(method), loading: false }
+  }
+
+  const setInvokeEntry = (method: string, patch: Partial<InvokeState>) => {
+    setInvokeMap((prev) => {
+      const current = prev[method] ?? { params: defaultParams(method), loading: false }
+      return { ...prev, [method]: { ...current, ...patch } }
+    })
+  }
+
+  const runRpcMethod = async (method: string) => {
+    if (nonRpcPseudoMethods.has(method)) return
+    const provider = getInjectedProvider()
+    if (!provider) {
+      setInvokeEntry(method, { error: tr(lang, 'No injected wallet provider found.', '未检测到注入钱包 Provider。') })
+      return
+    }
+
+    const entry = getInvokeEntry(method)
+    let parsedParams: unknown = []
+    try {
+      parsedParams = entry.params.trim() ? JSON.parse(entry.params) : []
+    } catch {
+      setInvokeEntry(method, {
+        loading: false,
+        result: undefined,
+        error: tr(lang, 'Invalid JSON params.', '参数 JSON 格式无效。'),
+      })
+      return
+    }
+
+    const params = Array.isArray(parsedParams) ? parsedParams : [parsedParams]
+    setInvokeEntry(method, { loading: true, error: undefined, result: undefined })
+
+    try {
+      const result = await provider.request({ method, params })
+      setInvokeEntry(method, {
+        loading: false,
+        result: JSON.stringify(result, null, 2),
+        error: undefined,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setInvokeEntry(method, { loading: false, result: undefined, error: message })
+    }
+  }
 
   return (
     <section className="card rpc-page">
@@ -624,6 +713,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                 <th>ethers.js</th>
                 <th>viem</th>
                 <th>wagmi</th>
+                <th>{tr(lang, 'Invoke', '调用')}</th>
               </tr>
             </thead>
             <tbody>
@@ -643,11 +733,39 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                     <td>
                       <code>{methodLibraryMapping(item.method).wagmi}</code>
                     </td>
+                    <td>
+                      <div className="rpc-invoke">
+                        <input
+                          className="rpc-params"
+                          value={getInvokeEntry(item.method).params}
+                          onChange={(event) => setInvokeEntry(item.method, { params: event.target.value })}
+                          placeholder={tr(lang, 'JSON params array', 'JSON 参数数组')}
+                          disabled={nonRpcPseudoMethods.has(item.method)}
+                        />
+                        <button
+                          className="rpc-run-btn"
+                          onClick={() => void runRpcMethod(item.method)}
+                          disabled={nonRpcPseudoMethods.has(item.method) || getInvokeEntry(item.method).loading}
+                        >
+                          {nonRpcPseudoMethods.has(item.method)
+                            ? tr(lang, 'N/A', '不可调用')
+                            : getInvokeEntry(item.method).loading
+                              ? tr(lang, 'Running...', '执行中...')
+                              : tr(lang, 'Run', '执行')}
+                        </button>
+                        {getInvokeEntry(item.method).result && (
+                          <pre className="rpc-output success">{getInvokeEntry(item.method).result}</pre>
+                        )}
+                        {getInvokeEntry(item.method).error && (
+                          <pre className="rpc-output error">{getInvokeEntry(item.method).error}</pre>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5}>{tr(lang, 'No matching methods.', '没有匹配的方法。')}</td>
+                  <td colSpan={6}>{tr(lang, 'No matching methods.', '没有匹配的方法。')}</td>
                 </tr>
               )}
             </tbody>
