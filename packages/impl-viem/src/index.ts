@@ -110,12 +110,13 @@ export const viemRunner: ClientRunner = {
         if (!targetHash) {
           throw new Error('No transaction hash found from previous steps');
         }
-        const [tx, receipt, currentBlock] = await Promise.all([
+        const [tx, receipt] = await Promise.all([
           publicClient.getTransaction({ hash: targetHash }),
           publicClient.getTransactionReceipt({ hash: targetHash }),
-          publicClient.getBlockNumber(),
         ]);
-        const confirmations = Number(currentBlock - tx.blockNumber + 1n);
+        const currentBlock = await publicClient.getBlockNumber();
+        const includedBlock = tx.blockNumber ?? receipt.blockNumber ?? currentBlock;
+        const confirmations = Number(currentBlock >= includedBlock ? currentBlock - includedBlock + 1n : 0n);
         return {
           hash: targetHash,
           status: receipt.status,

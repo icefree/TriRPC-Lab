@@ -39,6 +39,12 @@ export const ethersRunner: ClientRunner = {
     const wallet = new Wallet(ctx.privateKey, provider);
     const artifact = loadCounterArtifact();
     const counter = new Contract(ctx.counterAddress, artifact.abi, wallet);
+    let nextNonce = await provider.getTransactionCount(wallet.address, 'pending');
+    const consumeNonce = () => {
+      const nonce = nextNonce;
+      nextNonce += 1;
+      return nonce;
+    };
 
     const txHashes: { native?: `0x${string}`; contract?: `0x${string}` } = {};
 
@@ -62,6 +68,7 @@ export const ethersRunner: ClientRunner = {
         const tx = await wallet.sendTransaction({
           to: ctx.toAddress,
           value: parseEther('0.0001'),
+          nonce: consumeNonce(),
         });
         const receipt = await tx.wait();
         txHashes.native = tx.hash as `0x${string}`;
@@ -72,7 +79,7 @@ export const ethersRunner: ClientRunner = {
         };
       }),
       await runScenario('tx-write-contract', async () => {
-        const tx = await counter.increment();
+        const tx = await counter.increment({ nonce: consumeNonce() });
         const receipt = await tx.wait();
         txHashes.contract = tx.hash as `0x${string}`;
         return {
@@ -86,12 +93,10 @@ export const ethersRunner: ClientRunner = {
         if (!targetHash) {
           throw new Error('No transaction hash found from previous steps');
         }
-        const [tx, receipt] = await Promise.all([
-          provider.getTransaction(targetHash),
-          provider.getTransactionReceipt(targetHash),
-        ]);
+        const [tx, receipt] = await Promise.all([provider.getTransaction(targetHash), provider.getTransactionReceipt(targetHash)]);
         const currentBlock = await provider.getBlockNumber();
-        const confirmations = tx?.blockNumber ? currentBlock - tx.blockNumber + 1 : 0;
+        const includedBlock = tx?.blockNumber ?? receipt?.blockNumber ?? currentBlock;
+        const confirmations = Math.max(0, currentBlock - includedBlock + 1);
         return {
           hash: targetHash,
           hasTransaction: Boolean(tx),
