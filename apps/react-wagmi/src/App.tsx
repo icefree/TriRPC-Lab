@@ -125,6 +125,18 @@ const COUNTER_ABI = [
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const
 
+const RUNNER_WALLET_METHODS = new Set([
+  'eth_requestAccounts',
+  'eth_accounts',
+  'eth_sendTransaction',
+  'eth_signTransaction',
+  'eth_sign',
+  'eth_signTypedData',
+  'eth_signTypedData_v3',
+  'eth_signTypedData_v4',
+  'personal_sign',
+])
+
 const RPC_REFERENCE: RpcCategory[] = [
   {
     titleEn: 'Core Node Read APIs',
@@ -640,38 +652,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     setParamsMap((prev) => ({ ...prev, [method]: value }))
   }
 
-  const buildRunnerCode = (method: string, mode: InvokeMode, paramsText: string) => {
+  const buildRunnerCode = (method: string, paramsText: string) => {
     const safeParams = paramsText.trim() || '[]'
-    if (mode === 'rpc') {
-      return `const method = '${method}'\nconst params = ${safeParams}\nreturn await provider.request({ method, params })`
-    }
-    if (mode === 'ethers') {
-      return `const method = '${method}'\nconst params = ${safeParams}\nconst ethersProvider = new BrowserProvider(provider)\nreturn await ethersProvider.send(method, params)`
-    }
-    if (mode === 'viem') {
-      return `const method = '${method}'\nconst params = ${safeParams}\nconst walletMethods = ${JSON.stringify([
-        'eth_requestAccounts',
-        'eth_accounts',
-        'eth_sendTransaction',
-        'eth_signTransaction',
-        'eth_sign',
-        'eth_signTypedData',
-        'eth_signTypedData_v3',
-        'eth_signTypedData_v4',
-        'personal_sign',
-      ])}\nconst isWallet = method.startsWith('wallet_') || walletMethods.includes(method)\nif (isWallet) {\n  const walletClient = createWalletClient({ transport: custom(provider), chain: undefined })\n  return await walletClient.request({ method, params })\n}\nconst publicClient = createPublicClient({ transport: custom(provider) })\nreturn await publicClient.request({ method, params })`
-    }
-    return `const method = '${method}'\nconst params = ${safeParams}\nconst walletMethods = ${JSON.stringify([
-      'eth_requestAccounts',
-      'eth_accounts',
-      'eth_sendTransaction',
-      'eth_signTransaction',
-      'eth_sign',
-      'eth_signTypedData',
-      'eth_signTypedData_v3',
-      'eth_signTypedData_v4',
-      'personal_sign',
-    ])}\nconst isWallet = method.startsWith('wallet_') || walletMethods.includes(method)\nif (isWallet) {\n  if (!wagmiWalletClient) throw new Error('wagmi wallet client not ready')\n  return await wagmiWalletClient.request({ method, params })\n}\nif (!wagmiPublicClient) throw new Error('wagmi public client not ready')\nreturn await wagmiPublicClient.request({ method, params })`
+    return `const method = '${method}'\nconst params = ${safeParams}\nreturn await requestRpc(method, params)`
   }
 
   const getInvokeEntry = (method: string, mode: InvokeMode): InvokeState => {
@@ -687,16 +670,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
   }
 
   const requiresAuthorization = (method: string) => {
-    return (
-      method.startsWith('wallet_') ||
-      method === 'eth_sendTransaction' ||
-      method === 'eth_signTransaction' ||
-      method === 'eth_sign' ||
-      method === 'eth_signTypedData' ||
-      method === 'eth_signTypedData_v3' ||
-      method === 'eth_signTypedData_v4' ||
-      method === 'personal_sign'
-    )
+    if (method.startsWith('wallet_')) return true
+    if (!RUNNER_WALLET_METHODS.has(method)) return false
+    return method !== 'eth_requestAccounts' && method !== 'eth_accounts'
   }
 
   const ensureAuthorized = async (provider: Eip1193Provider, mode: InvokeMode) => {
@@ -744,10 +720,51 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     return normalized.includes('not been authorized') || normalized.includes('unauthorized')
   }
 
+  const isWalletRunnerMethod = (method: string) => {
+    return method.startsWith('wallet_') || RUNNER_WALLET_METHODS.has(method)
+  }
+
   const executeRunnerCode = async (
     provider: Eip1193Provider,
+    mode: InvokeMode,
     code: string,
   ): Promise<unknown> => {
+    const requestRpc = async (method: string, params: unknown) => {
+      if (mode === 'rpc') {
+        return await provider.request({ method, params: params as unknown[] | object })
+      }
+
+      if (mode === 'ethers') {
+        const ethersProvider = new BrowserProvider(provider)
+        const ethersParams = Array.isArray(params)
+          ? params
+          : typeof params === 'undefined'
+            ? []
+            : [params]
+        return await ethersProvider.send(method, ethersParams)
+      }
+
+      if (mode === 'viem') {
+        if (isWalletRunnerMethod(method)) {
+          const walletClient = createWalletClient({ transport: custom(provider), chain: undefined })
+          return await (walletClient as any).request({ method, params })
+        }
+        const publicClient = createPublicClient({ transport: custom(provider) })
+        return await (publicClient as any).request({ method, params })
+      }
+
+      if (isWalletRunnerMethod(method)) {
+        if (!wagmiWalletClient) {
+          throw new Error('wagmi wallet client not ready')
+        }
+        return await (wagmiWalletClient as any).request({ method, params })
+      }
+      if (!wagmiPublicClient) {
+        throw new Error('wagmi public client not ready')
+      }
+      return await (wagmiPublicClient as any).request({ method, params })
+    }
+
     const fn = new Function(
       'provider',
       'BrowserProvider',
@@ -756,6 +773,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       'custom',
       'wagmiPublicClient',
       'wagmiWalletClient',
+      'requestRpc',
       'parseEther',
       'formatEther',
       'parseUnits',
@@ -769,6 +787,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       custom: typeof import('viem').custom,
       wagmiPublicClient: ReturnType<typeof usePublicClient>,
       wagmiWalletClient: ReturnType<typeof useWalletClient>['data'],
+      requestRpc: (method: string, params: unknown) => Promise<unknown>,
       parseEther: typeof import('viem').parseEther,
       formatEther: typeof import('viem').formatEther,
       parseUnits: typeof import('viem').parseUnits,
@@ -783,6 +802,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       custom,
       wagmiPublicClient,
       wagmiWalletClient,
+      requestRpc,
       parseEther,
       formatEther,
       parseUnits,
@@ -794,7 +814,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     setRunnerDialog({
       method,
       mode,
-      code: buildRunnerCode(method, mode, getParamsValue(method)),
+      code: buildRunnerCode(method, getParamsValue(method)),
     })
   }
 
@@ -815,7 +835,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (requiresAuthorization(method) && method !== 'eth_requestAccounts') {
         await ensureAuthorized(provider, mode)
       }
-      const result = await executeRunnerCode(provider, code)
+      const result = await executeRunnerCode(provider, mode, code)
 
       setInvokeEntry(method, mode, {
         loading: false,
@@ -826,7 +846,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (!requiresAuthorization(method) && method !== 'eth_requestAccounts' && isUnauthorizedError(error)) {
         try {
           await ensureAuthorized(provider, mode)
-          const retryResult = await executeRunnerCode(provider, code)
+          const retryResult = await executeRunnerCode(provider, mode, code)
           setInvokeEntry(method, mode, {
             loading: false,
             result: JSON.stringify(retryResult, null, 2),
