@@ -720,6 +720,76 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     await (wagmiWalletClient as any).requestAddresses()
   }
 
+  const hasUnauthorizedCode = (value: unknown, seen = new Set<object>()): boolean => {
+    if (typeof value !== 'object' || value === null) return false
+    if (seen.has(value)) return false
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      return value.some((item) => hasUnauthorizedCode(item, seen))
+    }
+
+    const record = value as Record<string, unknown>
+    if (record.code === 4100 || record.code === '4100') return true
+
+    return ['error', 'cause', 'data', 'details', 'info', 'payload'].some((key) =>
+      hasUnauthorizedCode(record[key], seen),
+    )
+  }
+
+  const isUnauthorizedError = (error: unknown) => {
+    if (hasUnauthorizedCode(error)) return true
+    const message = error instanceof Error ? error.message : String(error)
+    const normalized = message.toLowerCase()
+    return normalized.includes('not been authorized') || normalized.includes('unauthorized')
+  }
+
+  const executeRunnerCode = async (
+    provider: Eip1193Provider,
+    code: string,
+  ): Promise<unknown> => {
+    const fn = new Function(
+      'provider',
+      'BrowserProvider',
+      'createPublicClient',
+      'createWalletClient',
+      'custom',
+      'wagmiPublicClient',
+      'wagmiWalletClient',
+      'parseEther',
+      'formatEther',
+      'parseUnits',
+      'formatUnits',
+      `"use strict"; return (async () => { ${code} })();`,
+    ) as (
+      provider: Eip1193Provider,
+      BrowserProvider: typeof import('ethers').BrowserProvider,
+      createPublicClient: typeof import('viem').createPublicClient,
+      createWalletClient: typeof import('viem').createWalletClient,
+      custom: typeof import('viem').custom,
+      wagmiPublicClient: ReturnType<typeof usePublicClient>,
+      wagmiWalletClient: ReturnType<typeof useWalletClient>['data'],
+      parseEther: typeof import('viem').parseEther,
+      formatEther: typeof import('viem').formatEther,
+      parseUnits: typeof import('viem').parseUnits,
+      formatUnits: typeof import('viem').formatUnits,
+    ) => Promise<unknown>
+
+    return await fn(
+      provider,
+      BrowserProvider,
+      createPublicClient,
+      createWalletClient,
+      custom,
+      wagmiPublicClient,
+      wagmiWalletClient,
+      parseEther,
+      formatEther,
+      parseUnits,
+      formatUnits,
+    )
+  }
+
   const openRunnerDialog = (method: string, mode: InvokeMode) => {
     setRunnerDialog({
       method,
@@ -745,47 +815,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (requiresAuthorization(method) && method !== 'eth_requestAccounts') {
         await ensureAuthorized(provider, mode)
       }
-
-      const fn = new Function(
-        'provider',
-        'BrowserProvider',
-        'createPublicClient',
-        'createWalletClient',
-        'custom',
-        'wagmiPublicClient',
-        'wagmiWalletClient',
-        'parseEther',
-        'formatEther',
-        'parseUnits',
-        'formatUnits',
-        `"use strict"; return (async () => { ${code} })();`,
-      ) as (
-        provider: Eip1193Provider,
-        BrowserProvider: typeof import('ethers').BrowserProvider,
-        createPublicClient: typeof import('viem').createPublicClient,
-        createWalletClient: typeof import('viem').createWalletClient,
-        custom: typeof import('viem').custom,
-        wagmiPublicClient: ReturnType<typeof usePublicClient>,
-        wagmiWalletClient: ReturnType<typeof useWalletClient>['data'],
-        parseEther: typeof import('viem').parseEther,
-        formatEther: typeof import('viem').formatEther,
-        parseUnits: typeof import('viem').parseUnits,
-        formatUnits: typeof import('viem').formatUnits,
-      ) => Promise<unknown>
-
-      const result = await fn(
-        provider,
-        BrowserProvider,
-        createPublicClient,
-        createWalletClient,
-        custom,
-        wagmiPublicClient,
-        wagmiWalletClient,
-        parseEther,
-        formatEther,
-        parseUnits,
-        formatUnits,
-      )
+      const result = await executeRunnerCode(provider, code)
 
       setInvokeEntry(method, mode, {
         loading: false,
@@ -793,6 +823,23 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         error: undefined,
       })
     } catch (error) {
+      if (!requiresAuthorization(method) && method !== 'eth_requestAccounts' && isUnauthorizedError(error)) {
+        try {
+          await ensureAuthorized(provider, mode)
+          const retryResult = await executeRunnerCode(provider, code)
+          setInvokeEntry(method, mode, {
+            loading: false,
+            result: JSON.stringify(retryResult, null, 2),
+            error: undefined,
+          })
+          return
+        } catch (retryError) {
+          const retryMessage = retryError instanceof Error ? retryError.message : String(retryError)
+          setInvokeEntry(method, mode, { loading: false, result: undefined, error: retryMessage })
+          return
+        }
+      }
+
       const message = error instanceof Error ? error.message : String(error)
       setInvokeEntry(method, mode, { loading: false, result: undefined, error: message })
     }
