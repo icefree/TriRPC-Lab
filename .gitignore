@@ -1,0 +1,11 @@
+node_modules
+.pnpm-store
+.env
+.env.*
+dist
+coverage
+artifacts
+contracts/artifacts
+contracts/deployments
+apps/react-wagmi/node_modules
+apps/react-wagmi/dist

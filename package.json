@@ -1,0 +1,26 @@
+{
+  "name": "ether-viem-wagmi-compare",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "run:all": "tsx scripts/run-all.ts",
+    "compile:contract": "tsx scripts/compile-contract.ts",
+    "deploy:contract": "tsx scripts/deploy-contract.ts"
+  },
+  "dependencies": {
+    "@compare/impl-ethers": "workspace:*",
+    "@compare/impl-viem": "workspace:*",
+    "@compare/scenarios": "workspace:*",
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "dotenv": "^16.4.7",
+    "solc": "^0.8.30",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
