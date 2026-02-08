@@ -652,9 +652,69 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     setParamsMap((prev) => ({ ...prev, [method]: value }))
   }
 
-  const buildRunnerCode = (method: string, paramsText: string) => {
+  const buildRunnerCode = (method: string, mode: InvokeMode, paramsText: string) => {
     const safeParams = paramsText.trim() || '[]'
-    return `const method = '${method}'\nconst params = ${safeParams}\nreturn await requestRpc(method, params)`
+    if (mode === 'rpc') {
+      return `const method = '${method}'\nconst params = ${safeParams}\nreturn await requestRpc(method, params)`
+    }
+    const modeRunner =
+      mode === 'ethers'
+        ? 'runEthersMethod'
+        : mode === 'viem'
+          ? 'runViemMethod'
+          : 'runWagmiMethod'
+    return `const method = '${method}'\nconst params = ${safeParams}\nreturn await ${modeRunner}(method, params)`
+  }
+
+  const normalizeRunnerParams = (params: unknown): unknown[] => {
+    if (Array.isArray(params)) return params
+    if (typeof params === 'undefined') return []
+    return [params]
+  }
+
+  const parseQuantity = (value: unknown): bigint | undefined => {
+    if (typeof value === 'bigint') return value
+    if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value))
+    if (typeof value !== 'string' || value.trim().length === 0) return undefined
+    try {
+      return BigInt(value)
+    } catch {
+      return undefined
+    }
+  }
+
+  const parseBlockSelector = (
+    value: unknown,
+  ): bigint | 'latest' | 'earliest' | 'pending' | 'safe' | 'finalized' | undefined => {
+    if (
+      value === 'latest' ||
+      value === 'earliest' ||
+      value === 'pending' ||
+      value === 'safe' ||
+      value === 'finalized'
+    ) {
+      return value
+    }
+    return parseQuantity(value)
+  }
+
+  const parseTypedData = (value: unknown): Record<string, unknown> | undefined => {
+    if (typeof value === 'object' && value !== null) return value as Record<string, unknown>
+    if (typeof value !== 'string') return undefined
+    try {
+      const parsed = JSON.parse(value)
+      if (typeof parsed === 'object' && parsed !== null) return parsed as Record<string, unknown>
+    } catch {
+      return undefined
+    }
+    return undefined
+  }
+
+  const buildViemBlockScope = (selector: unknown) => {
+    const parsed = parseBlockSelector(selector)
+    if (typeof parsed === 'bigint') return { blockNumber: parsed }
+    if (typeof parsed === 'string') return { blockTag: parsed }
+    return {}
   }
 
   const getInvokeEntry = (method: string, mode: InvokeMode): InvokeState => {
@@ -736,11 +796,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
 
       if (mode === 'ethers') {
         const ethersProvider = new BrowserProvider(provider)
-        const ethersParams = Array.isArray(params)
-          ? params
-          : typeof params === 'undefined'
-            ? []
-            : [params]
+        const ethersParams = normalizeRunnerParams(params)
         return await ethersProvider.send(method, ethersParams)
       }
 
@@ -765,6 +821,414 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       return await (wagmiPublicClient as any).request({ method, params })
     }
 
+    const resolveWalletAccount = async (walletClient: any, preferred?: unknown) => {
+      if (typeof preferred === 'string' && preferred.startsWith('0x')) return preferred as Hex
+      if (typeof walletClient?.getAddresses === 'function') {
+        const addresses = await walletClient.getAddresses()
+        if (Array.isArray(addresses) && typeof addresses[0] === 'string') return addresses[0] as Hex
+      }
+      if (typeof walletClient?.requestAddresses === 'function') {
+        const addresses = await walletClient.requestAddresses()
+        if (Array.isArray(addresses) && typeof addresses[0] === 'string') return addresses[0] as Hex
+      }
+      return undefined
+    }
+
+    const runViemLikeMethod = async (
+      method: string,
+      params: unknown,
+      clients: {
+        publicClient?: any
+        walletClient?: any
+        walletError: string
+        publicError: string
+      },
+    ): Promise<unknown> => {
+      const paramsArray = normalizeRunnerParams(params)
+      const walletRequestFallback = async () => {
+        if (!clients.walletClient) throw new Error(clients.walletError)
+        return await clients.walletClient.request({ method, params: paramsArray })
+      }
+      const publicRequestFallback = async () => {
+        if (!clients.publicClient) throw new Error(clients.publicError)
+        return await clients.publicClient.request({ method, params: paramsArray })
+      }
+
+      switch (method) {
+        case 'eth_chainId': {
+          if (!clients.publicClient?.getChainId) return await publicRequestFallback()
+          const chainId = await clients.publicClient.getChainId()
+          return `0x${chainId.toString(16)}`
+        }
+        case 'eth_blockNumber': {
+          if (!clients.publicClient?.getBlockNumber) return await publicRequestFallback()
+          const blockNumber = await clients.publicClient.getBlockNumber()
+          return `0x${blockNumber.toString(16)}`
+        }
+        case 'eth_getBalance': {
+          if (!clients.publicClient?.getBalance) return await publicRequestFallback()
+          const [address, blockRef] = paramsArray
+          if (typeof address !== 'string') return await publicRequestFallback()
+          return await clients.publicClient.getBalance({
+            address,
+            ...buildViemBlockScope(blockRef),
+          })
+        }
+        case 'eth_getTransactionCount': {
+          if (!clients.publicClient?.getTransactionCount) return await publicRequestFallback()
+          const [address, blockRef] = paramsArray
+          if (typeof address !== 'string') return await publicRequestFallback()
+          return await clients.publicClient.getTransactionCount({
+            address,
+            ...buildViemBlockScope(blockRef),
+          })
+        }
+        case 'eth_getCode': {
+          const [address, blockRef] = paramsArray
+          if (typeof address !== 'string') return await publicRequestFallback()
+          const request = { address, ...buildViemBlockScope(blockRef) }
+          if (typeof clients.publicClient?.getCode === 'function') {
+            return await clients.publicClient.getCode(request)
+          }
+          if (typeof clients.publicClient?.getBytecode === 'function') {
+            return await clients.publicClient.getBytecode(request)
+          }
+          return await publicRequestFallback()
+        }
+        case 'eth_getStorageAt': {
+          if (!clients.publicClient?.getStorageAt) return await publicRequestFallback()
+          const [address, slotValue, blockRef] = paramsArray
+          if (typeof address !== 'string') return await publicRequestFallback()
+          const slot = parseQuantity(slotValue)
+          if (typeof slot !== 'bigint') return await publicRequestFallback()
+          return await clients.publicClient.getStorageAt({
+            address,
+            slot,
+            ...buildViemBlockScope(blockRef),
+          })
+        }
+        case 'eth_getBlockByNumber': {
+          if (!clients.publicClient?.getBlock) return await publicRequestFallback()
+          const [blockRef, includeTransactions] = paramsArray
+          const parsed = parseBlockSelector(blockRef)
+          if (typeof parsed === 'bigint') {
+            return await clients.publicClient.getBlock({
+              blockNumber: parsed,
+              includeTransactions: Boolean(includeTransactions),
+            })
+          }
+          return await clients.publicClient.getBlock({
+            blockTag: parsed ?? 'latest',
+            includeTransactions: Boolean(includeTransactions),
+          })
+        }
+        case 'eth_getBlockByHash': {
+          if (!clients.publicClient?.getBlock) return await publicRequestFallback()
+          const [blockHash, includeTransactions] = paramsArray
+          if (typeof blockHash !== 'string') return await publicRequestFallback()
+          return await clients.publicClient.getBlock({
+            blockHash,
+            includeTransactions: Boolean(includeTransactions),
+          })
+        }
+        case 'eth_getTransactionByHash': {
+          if (!clients.publicClient?.getTransaction) return await publicRequestFallback()
+          const [hash] = paramsArray
+          if (typeof hash !== 'string') return await publicRequestFallback()
+          return await clients.publicClient.getTransaction({ hash })
+        }
+        case 'eth_getTransactionReceipt': {
+          if (!clients.publicClient?.getTransactionReceipt) return await publicRequestFallback()
+          const [hash] = paramsArray
+          if (typeof hash !== 'string') return await publicRequestFallback()
+          return await clients.publicClient.getTransactionReceipt({ hash })
+        }
+        case 'eth_getLogs': {
+          if (!clients.publicClient?.getLogs) return await publicRequestFallback()
+          const [filter] = paramsArray
+          if (typeof filter !== 'object' || filter === null) return await clients.publicClient.getLogs({})
+          return await clients.publicClient.getLogs(filter)
+        }
+        case 'eth_call': {
+          if (!clients.publicClient?.call) return await publicRequestFallback()
+          const [request, blockRef] = paramsArray
+          if (typeof request !== 'object' || request === null) return await publicRequestFallback()
+          return await clients.publicClient.call({
+            ...(request as Record<string, unknown>),
+            ...buildViemBlockScope(blockRef),
+          })
+        }
+        case 'eth_estimateGas': {
+          if (!clients.publicClient?.estimateGas) return await publicRequestFallback()
+          const [request, blockRef] = paramsArray
+          if (typeof request !== 'object' || request === null) return await publicRequestFallback()
+          return await clients.publicClient.estimateGas({
+            ...(request as Record<string, unknown>),
+            ...buildViemBlockScope(blockRef),
+          })
+        }
+        case 'eth_gasPrice': {
+          if (!clients.publicClient?.getGasPrice) return await publicRequestFallback()
+          return await clients.publicClient.getGasPrice()
+        }
+        case 'eth_feeHistory': {
+          if (!clients.publicClient?.getFeeHistory) return await publicRequestFallback()
+          const [blockCountValue, newestBlockValue, rewardValue] = paramsArray
+          const blockCount = parseQuantity(blockCountValue)
+          if (typeof blockCount !== 'bigint') return await publicRequestFallback()
+          const newestBlock = parseBlockSelector(newestBlockValue) ?? 'latest'
+          const rewardPercentiles = Array.isArray(rewardValue) ? rewardValue.map((item) => Number(item)) : []
+          return await clients.publicClient.getFeeHistory({
+            blockCount,
+            newestBlock,
+            rewardPercentiles,
+          })
+        }
+        case 'eth_maxPriorityFeePerGas': {
+          if (!clients.publicClient?.estimateMaxPriorityFeePerGas) return await publicRequestFallback()
+          return await clients.publicClient.estimateMaxPriorityFeePerGas()
+        }
+        case 'eth_sendRawTransaction': {
+          if (!clients.publicClient?.sendRawTransaction) return await publicRequestFallback()
+          const [serializedTransaction] = paramsArray
+          if (typeof serializedTransaction !== 'string') return await publicRequestFallback()
+          return await clients.publicClient.sendRawTransaction({ serializedTransaction })
+        }
+        case 'eth_sendTransaction': {
+          if (!clients.walletClient?.sendTransaction) return await walletRequestFallback()
+          const [txRequestRaw] = paramsArray
+          if (typeof txRequestRaw !== 'object' || txRequestRaw === null) return await walletRequestFallback()
+          const txRequest = { ...(txRequestRaw as Record<string, unknown>) }
+          if (typeof txRequest.account === 'undefined') {
+            const account = await resolveWalletAccount(clients.walletClient, txRequest.from)
+            if (account) txRequest.account = account
+          }
+          return await clients.walletClient.sendTransaction(txRequest)
+        }
+        case 'eth_signTransaction': {
+          if (!clients.walletClient?.signTransaction) return await walletRequestFallback()
+          const [txRequestRaw] = paramsArray
+          if (typeof txRequestRaw !== 'object' || txRequestRaw === null) return await walletRequestFallback()
+          const txRequest = { ...(txRequestRaw as Record<string, unknown>) }
+          if (typeof txRequest.account === 'undefined') {
+            const account = await resolveWalletAccount(clients.walletClient, txRequest.from)
+            if (account) txRequest.account = account
+          }
+          return await clients.walletClient.signTransaction(txRequest)
+        }
+        case 'eth_requestAccounts': {
+          if (typeof clients.walletClient?.requestAddresses === 'function') {
+            return await clients.walletClient.requestAddresses()
+          }
+          return await walletRequestFallback()
+        }
+        case 'eth_accounts': {
+          if (typeof clients.walletClient?.getAddresses === 'function') {
+            return await clients.walletClient.getAddresses()
+          }
+          if (typeof clients.walletClient?.requestAddresses === 'function') {
+            return await clients.walletClient.requestAddresses()
+          }
+          return await walletRequestFallback()
+        }
+        case 'wallet_switchEthereumChain': {
+          if (!clients.walletClient?.switchChain) return await walletRequestFallback()
+          const [switchArgsRaw] = paramsArray
+          if (typeof switchArgsRaw !== 'object' || switchArgsRaw === null) return await walletRequestFallback()
+          const switchArgs = switchArgsRaw as Record<string, unknown>
+          const chainId = parseQuantity(switchArgs.chainId)
+          if (typeof chainId !== 'bigint') return await walletRequestFallback()
+          return await clients.walletClient.switchChain({ id: Number(chainId) })
+        }
+        case 'personal_sign': {
+          if (!clients.walletClient?.signMessage) return await walletRequestFallback()
+          const [messageRaw, accountRaw] = paramsArray
+          const account = await resolveWalletAccount(clients.walletClient, accountRaw)
+          if (typeof messageRaw === 'string' && messageRaw.startsWith('0x')) {
+            return await clients.walletClient.signMessage({ account, message: { raw: messageRaw } })
+          }
+          return await clients.walletClient.signMessage({ account, message: String(messageRaw ?? '') })
+        }
+        case 'eth_signTypedData_v4': {
+          if (!clients.walletClient?.signTypedData) return await walletRequestFallback()
+          const [accountRaw, typedDataRaw] = paramsArray
+          const typedData = parseTypedData(typedDataRaw)
+          if (!typedData) return await walletRequestFallback()
+          const rawTypes =
+            typeof typedData.types === 'object' && typedData.types !== null
+              ? { ...(typedData.types as Record<string, unknown>) }
+              : {}
+          delete rawTypes.EIP712Domain
+          const account = await resolveWalletAccount(clients.walletClient, accountRaw)
+          return await clients.walletClient.signTypedData({
+            account,
+            domain: (typedData.domain ?? {}) as Record<string, unknown>,
+            types: rawTypes,
+            primaryType: typedData.primaryType as string | undefined,
+            message: (typedData.message ?? {}) as Record<string, unknown>,
+          })
+        }
+        default:
+          if (isWalletRunnerMethod(method)) {
+            return await walletRequestFallback()
+          }
+          return await publicRequestFallback()
+      }
+    }
+
+    const runEthersMethod = async (method: string, params: unknown): Promise<unknown> => {
+      const paramsArray = normalizeRunnerParams(params)
+      const ethersProvider = new BrowserProvider(provider)
+
+      switch (method) {
+        case 'eth_chainId': {
+          const network = await ethersProvider.getNetwork()
+          return `0x${network.chainId.toString(16)}`
+        }
+        case 'eth_blockNumber': {
+          const blockNumber = await ethersProvider.getBlockNumber()
+          return `0x${blockNumber.toString(16)}`
+        }
+        case 'eth_getBalance': {
+          const [address, blockRef] = paramsArray
+          if (typeof address !== 'string') return await requestRpc(method, paramsArray)
+          return await ethersProvider.getBalance(address, blockRef as any)
+        }
+        case 'eth_getTransactionCount': {
+          const [address, blockRef] = paramsArray
+          if (typeof address !== 'string') return await requestRpc(method, paramsArray)
+          return await ethersProvider.getTransactionCount(address, blockRef as any)
+        }
+        case 'eth_getCode': {
+          const [address, blockRef] = paramsArray
+          if (typeof address !== 'string') return await requestRpc(method, paramsArray)
+          return await ethersProvider.getCode(address, blockRef as any)
+        }
+        case 'eth_getStorageAt': {
+          const [address, slotValue, blockRef] = paramsArray
+          if (typeof address !== 'string') return await requestRpc(method, paramsArray)
+          const slot = parseQuantity(slotValue)
+          if (typeof slot !== 'bigint') return await requestRpc(method, paramsArray)
+          return await ethersProvider.getStorage(address, slot, blockRef as any)
+        }
+        case 'eth_getBlockByNumber': {
+          const [blockRef, includeTransactions] = paramsArray
+          const parsed = parseBlockSelector(blockRef)
+          if (typeof parsed === 'bigint') {
+            return await ethersProvider.getBlock(Number(parsed), Boolean(includeTransactions))
+          }
+          return await ethersProvider.getBlock((parsed ?? 'latest') as any, Boolean(includeTransactions))
+        }
+        case 'eth_getBlockByHash': {
+          const [blockHash, includeTransactions] = paramsArray
+          if (typeof blockHash !== 'string') return await requestRpc(method, paramsArray)
+          return await ethersProvider.getBlock(blockHash as Hex, Boolean(includeTransactions))
+        }
+        case 'eth_getTransactionByHash': {
+          const [hash] = paramsArray
+          if (typeof hash !== 'string') return await requestRpc(method, paramsArray)
+          return await ethersProvider.getTransaction(hash as Hex)
+        }
+        case 'eth_getTransactionReceipt': {
+          const [hash] = paramsArray
+          if (typeof hash !== 'string') return await requestRpc(method, paramsArray)
+          return await ethersProvider.getTransactionReceipt(hash as Hex)
+        }
+        case 'eth_getLogs': {
+          const [filter] = paramsArray
+          if (typeof filter !== 'object' || filter === null) return await ethersProvider.getLogs({})
+          return await ethersProvider.getLogs(filter as any)
+        }
+        case 'eth_call': {
+          const [tx, blockRef] = paramsArray
+          if (typeof tx !== 'object' || tx === null) return await requestRpc(method, paramsArray)
+          const request = { ...(tx as Record<string, unknown>) }
+          if (typeof blockRef !== 'undefined') request.blockTag = blockRef
+          return await ethersProvider.call(request as any)
+        }
+        case 'eth_estimateGas': {
+          const [tx, blockRef] = paramsArray
+          if (typeof tx !== 'object' || tx === null) return await requestRpc(method, paramsArray)
+          const request = { ...(tx as Record<string, unknown>) }
+          if (typeof blockRef !== 'undefined') request.blockTag = blockRef
+          return await ethersProvider.estimateGas(request as any)
+        }
+        case 'eth_gasPrice': {
+          const feeData = await ethersProvider.getFeeData()
+          return feeData.gasPrice
+        }
+        case 'eth_sendRawTransaction': {
+          const [rawTx] = paramsArray
+          if (typeof rawTx !== 'string') return await requestRpc(method, paramsArray)
+          return await ethersProvider.broadcastTransaction(rawTx)
+        }
+        case 'eth_sendTransaction': {
+          const [txRequest] = paramsArray
+          if (typeof txRequest !== 'object' || txRequest === null) return await requestRpc(method, paramsArray)
+          const signer = await ethersProvider.getSigner()
+          return await signer.sendTransaction(txRequest as any)
+        }
+        case 'eth_signTransaction': {
+          const [txRequest] = paramsArray
+          if (typeof txRequest !== 'object' || txRequest === null) return await requestRpc(method, paramsArray)
+          const signer = await ethersProvider.getSigner()
+          return await signer.signTransaction(txRequest as any)
+        }
+        case 'eth_requestAccounts':
+          return await ethersProvider.send('eth_requestAccounts', [])
+        case 'eth_accounts': {
+          const signer = await ethersProvider.getSigner()
+          return [await signer.getAddress()]
+        }
+        case 'personal_sign': {
+          const [messageRaw] = paramsArray
+          const signer = await ethersProvider.getSigner()
+          return await signer.signMessage(String(messageRaw ?? ''))
+        }
+        case 'eth_signTypedData_v4': {
+          const [accountRaw, typedDataRaw] = paramsArray
+          const typedData = parseTypedData(typedDataRaw)
+          if (!typedData) return await requestRpc(method, paramsArray)
+          const signer =
+            typeof accountRaw === 'string' && accountRaw.startsWith('0x')
+              ? await ethersProvider.getSigner(accountRaw)
+              : await ethersProvider.getSigner()
+          const rawTypes =
+            typeof typedData.types === 'object' && typedData.types !== null
+              ? { ...(typedData.types as Record<string, unknown>) }
+              : {}
+          delete rawTypes.EIP712Domain
+          return await signer.signTypedData(
+            (typedData.domain ?? {}) as Record<string, unknown>,
+            rawTypes as any,
+            (typedData.message ?? {}) as Record<string, unknown>,
+          )
+        }
+        default:
+          return await requestRpc(method, paramsArray)
+      }
+    }
+
+    const runViemMethod = async (method: string, params: unknown): Promise<unknown> => {
+      const publicClient = createPublicClient({ transport: custom(provider) })
+      const walletClient = createWalletClient({ transport: custom(provider), chain: undefined })
+      return await runViemLikeMethod(method, params, {
+        publicClient,
+        walletClient,
+        walletError: 'viem wallet client not ready',
+        publicError: 'viem public client not ready',
+      })
+    }
+
+    const runWagmiMethod = async (method: string, params: unknown): Promise<unknown> => {
+      return await runViemLikeMethod(method, params, {
+        publicClient: wagmiPublicClient,
+        walletClient: wagmiWalletClient,
+        walletError: 'wagmi wallet client not ready',
+        publicError: 'wagmi public client not ready',
+      })
+    }
+
     const fn = new Function(
       'provider',
       'BrowserProvider',
@@ -774,6 +1238,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       'wagmiPublicClient',
       'wagmiWalletClient',
       'requestRpc',
+      'runEthersMethod',
+      'runViemMethod',
+      'runWagmiMethod',
       'parseEther',
       'formatEther',
       'parseUnits',
@@ -788,6 +1255,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       wagmiPublicClient: ReturnType<typeof usePublicClient>,
       wagmiWalletClient: ReturnType<typeof useWalletClient>['data'],
       requestRpc: (method: string, params: unknown) => Promise<unknown>,
+      runEthersMethod: (method: string, params: unknown) => Promise<unknown>,
+      runViemMethod: (method: string, params: unknown) => Promise<unknown>,
+      runWagmiMethod: (method: string, params: unknown) => Promise<unknown>,
       parseEther: typeof import('viem').parseEther,
       formatEther: typeof import('viem').formatEther,
       parseUnits: typeof import('viem').parseUnits,
@@ -803,6 +1273,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       wagmiPublicClient,
       wagmiWalletClient,
       requestRpc,
+      runEthersMethod,
+      runViemMethod,
+      runWagmiMethod,
       parseEther,
       formatEther,
       parseUnits,
@@ -814,7 +1287,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     setRunnerDialog({
       method,
       mode,
-      code: buildRunnerCode(method, getParamsValue(method)),
+      code: buildRunnerCode(method, mode, getParamsValue(method)),
     })
   }
 
