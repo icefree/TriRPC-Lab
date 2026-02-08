@@ -1435,7 +1435,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         mapping: mappingText,
         paramsText,
       })
-      console.info(`[TriRPC] executable code (${mode}:${method})\n${code}`)
+      // console.info(`[TriRPC] executable code (${mode}:${method})\n${code}`)
       const result = await executeRunnerCode(provider, mode, code)
       const resultText = formatRunnerResult(result)
       console.info('[TriRPC] invoke result', {
@@ -1961,6 +1961,7 @@ function EthersPanel({ lang, balanceAddress, to, value, txHash, contractAddress 
   const [txInfo, setTxInfo] = useState('')
   const [contractRead, setContractRead] = useState('')
   const [contractWrite, setContractWrite] = useState('')
+  const [isIncrementPending, setIsIncrementPending] = useState(false)
   const [error, setError] = useState('')
 
   const refreshChainInfo = async () => {
@@ -2065,6 +2066,7 @@ function EthersPanel({ lang, balanceAddress, to, value, txHash, contractAddress 
     try {
       setError('')
       setContractWrite('')
+      setIsIncrementPending(true)
       if (!contractAddress) throw new Error(tr(lang, 'Invalid contract address', '合约地址无效'))
       const injected = getInjectedProvider()
       if (!injected) throw new Error(tr(lang, 'No injected wallet found', '未检测到浏览器钱包'))
@@ -2072,10 +2074,13 @@ function EthersPanel({ lang, balanceAddress, to, value, txHash, contractAddress 
       const signer = await provider.getSigner()
       const contract = new Contract(contractAddress, COUNTER_ABI, signer)
       const tx = await contract.increment()
+      setContractWrite(`hash:${tx.hash} status:pending`)
       const receipt = await tx.wait()
       setContractWrite(`hash:${tx.hash} status:${receipt?.status ?? 'n/a'}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setIsIncrementPending(false)
     }
   }
 
@@ -2108,7 +2113,9 @@ function EthersPanel({ lang, balanceAddress, to, value, txHash, contractAddress 
         <p>{contractRead || '-'}</p>
       </ActionBlock>
       <ActionBlock code={CODES.ethers.writeContract} lang={lang}>
-        <button onClick={incrementContract}>{tr(lang, 'Call increment()', '调用 increment()')}</button>
+        <button onClick={incrementContract} disabled={isIncrementPending}>
+          {isIncrementPending ? tr(lang, 'Waiting Confirmation...', '等待确认中...') : tr(lang, 'Call increment()', '调用 increment()')}
+        </button>
         <p>{contractWrite || '-'}</p>
       </ActionBlock>
       {error && <p className="error">{error}</p>}
@@ -2125,6 +2132,7 @@ function ViemPanel({ lang, balanceAddress, to, value, txHash, contractAddress }:
   const [txInfo, setTxInfo] = useState('')
   const [contractRead, setContractRead] = useState('')
   const [contractWrite, setContractWrite] = useState('')
+  const [isIncrementPending, setIsIncrementPending] = useState(false)
   const [error, setError] = useState('')
 
   const refreshChainInfo = async () => {
@@ -2239,6 +2247,7 @@ function ViemPanel({ lang, balanceAddress, to, value, txHash, contractAddress }:
     try {
       setError('')
       setContractWrite('')
+      setIsIncrementPending(true)
       if (!contractAddress) throw new Error(tr(lang, 'Invalid contract address', '合约地址无效'))
       const injected = getInjectedProvider()
       if (!injected) throw new Error(tr(lang, 'No injected wallet found', '未检测到浏览器钱包'))
@@ -2252,10 +2261,13 @@ function ViemPanel({ lang, balanceAddress, to, value, txHash, contractAddress }:
         abi: COUNTER_ABI,
         functionName: 'increment',
       })
+      setContractWrite(`hash:${hash} status:pending`)
       const receipt = await publicClient.waitForTransactionReceipt({ hash })
       setContractWrite(`hash:${hash} status:${receipt.status}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setIsIncrementPending(false)
     }
   }
 
@@ -2288,7 +2300,9 @@ function ViemPanel({ lang, balanceAddress, to, value, txHash, contractAddress }:
         <p>{contractRead || '-'}</p>
       </ActionBlock>
       <ActionBlock code={CODES.viem.writeContract} lang={lang}>
-        <button onClick={incrementContract}>{tr(lang, 'Call increment()', '调用 increment()')}</button>
+        <button onClick={incrementContract} disabled={isIncrementPending}>
+          {isIncrementPending ? tr(lang, 'Waiting Confirmation...', '等待确认中...') : tr(lang, 'Call increment()', '调用 increment()')}
+        </button>
         <p>{contractWrite || '-'}</p>
       </ActionBlock>
       {error && <p className="error">{error}</p>}
@@ -2328,7 +2342,7 @@ function WagmiPanel({ lang, balanceAddress, to, value, txHash, contractAddress }
 
   const { data: incrementHash, error: incrementError, isPending: isIncrementPending, writeContract } = useWriteContract()
 
-  const { data: incrementReceipt } = useWaitForTransactionReceipt({
+  const { data: incrementReceipt, isLoading: isIncrementConfirming } = useWaitForTransactionReceipt({
     hash: incrementHash,
     query: { enabled: Boolean(incrementHash) },
   })
@@ -2411,10 +2425,23 @@ function WagmiPanel({ lang, balanceAddress, to, value, txHash, contractAddress }
       </ActionBlock>
 
       <ActionBlock code={CODES.wagmi.writeContract} lang={lang}>
-        <button onClick={handleContractIncrement} disabled={!isConnected || isIncrementPending || !contractAddress}>
-          {isIncrementPending ? tr(lang, 'Calling...', '调用中...') : tr(lang, 'Call increment()', '调用 increment()')}
+        <button
+          onClick={handleContractIncrement}
+          disabled={!isConnected || isIncrementPending || isIncrementConfirming || !contractAddress}
+        >
+          {isIncrementPending
+            ? tr(lang, 'Calling...', '调用中...')
+            : isIncrementConfirming
+              ? tr(lang, 'Waiting Confirmation...', '等待确认中...')
+              : tr(lang, 'Call increment()', '调用 increment()')}
         </button>
-        <p>{incrementHash ? `hash:${incrementHash} status:${incrementReceipt?.status ?? 'pending'}` : '-'}</p>
+        <p>
+          {incrementHash
+            ? isIncrementConfirming
+              ? `hash:${incrementHash} status:${tr(lang, 'pending', '确认中')}`
+              : `hash:${incrementHash} status:${incrementReceipt?.status ?? 'pending'}`
+            : '-'}
+        </p>
       </ActionBlock>
 
       {incrementError && <p className="error">{incrementError.message}</p>}
