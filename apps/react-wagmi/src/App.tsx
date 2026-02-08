@@ -70,12 +70,6 @@ type InvokeState = {
 
 type InvokeMode = 'rpc' | 'ethers' | 'viem' | 'wagmi'
 
-type RunnerDialogState = {
-  method: string
-  mode: InvokeMode
-  code: string
-}
-
 const CODES: Record<'ethers' | 'viem' | 'wagmi', ActionCode> = {
   ethers: {
     connect: `const provider = new BrowserProvider(window.ethereum)\nawait provider.send('eth_requestAccounts', [])\nconst signer = await provider.getSigner()\nconst address = await signer.getAddress()`,
@@ -592,7 +586,6 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
   const [query, setQuery] = useState('')
   const [paramsMap, setParamsMap] = useState<Record<string, string>>({})
   const [invokeMap, setInvokeMap] = useState<Record<string, InvokeState>>({})
-  const [runnerDialog, setRunnerDialog] = useState<RunnerDialogState | null>(null)
   const wagmiPublicClient = usePublicClient()
   const { data: wagmiWalletClient } = useWalletClient()
   const category = RPC_REFERENCE[activeCategory]
@@ -1284,17 +1277,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     )
   }
 
-  const openRunnerDialog = (method: string, mode: InvokeMode) => {
-    setRunnerDialog({
-      method,
-      mode,
-      code: buildRunnerCode(method, mode, getParamsValue(method)),
-    })
-  }
-
-  const runEditedCode = async () => {
-    if (!runnerDialog) return
-    const { method, mode, code } = runnerDialog
+  const runMethod = async (method: string, mode: InvokeMode) => {
     if (nonRpcPseudoMethods.has(method)) return
     const provider = getInjectedProvider()
     if (!provider) {
@@ -1309,6 +1292,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (requiresAuthorization(method) && method !== 'eth_requestAccounts') {
         await ensureAuthorized(provider, mode)
       }
+      const code = buildRunnerCode(method, mode, getParamsValue(method))
       const result = await executeRunnerCode(provider, mode, code)
 
       setInvokeEntry(method, mode, {
@@ -1320,6 +1304,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (!requiresAuthorization(method) && method !== 'eth_requestAccounts' && isUnauthorizedError(error)) {
         try {
           await ensureAuthorized(provider, mode)
+          const code = buildRunnerCode(method, mode, getParamsValue(method))
           const retryResult = await executeRunnerCode(provider, mode, code)
           setInvokeEntry(method, mode, {
             loading: false,
@@ -1347,7 +1332,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
           <code>{mappingText}</code>
           <button
             className="rpc-run-btn"
-            onClick={() => openRunnerDialog(method, mode)}
+            onClick={() => void runMethod(method, mode)}
             disabled={nonRpcPseudoMethods.has(method) || entry.loading}
           >
             {nonRpcPseudoMethods.has(method)
@@ -1362,10 +1347,6 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       </td>
     )
   }
-
-  const runnerEntry = runnerDialog
-    ? getInvokeEntry(runnerDialog.method, runnerDialog.mode)
-    : undefined
 
   return (
     <section className="card rpc-page">
@@ -1459,41 +1440,6 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         </div>
       </div>
 
-      {runnerDialog && (
-        <div className="runner-overlay" role="dialog" aria-modal="true">
-          <div className="runner-modal">
-            <h3>
-              {tr(lang, 'Edit Then Run', '编辑后执行')} - {runnerDialog.mode} / {runnerDialog.method}
-            </h3>
-            <p className="runner-tip">
-              {tr(
-                lang,
-                'You can edit the code below before execution. Return a value to display the result. Built-ins: parseEther, formatEther, parseUnits, formatUnits.',
-                '可先编辑下面代码再执行。请返回一个值用于展示结果。默认可用：parseEther、formatEther、parseUnits、formatUnits。',
-              )}
-            </p>
-            <textarea
-              value={runnerDialog.code}
-              onChange={(event) =>
-                setRunnerDialog((prev) => (prev ? { ...prev, code: event.target.value } : prev))
-              }
-            />
-            <div className="runner-actions">
-              <button onClick={() => setRunnerDialog(null)}>{tr(lang, 'Cancel', '取消')}</button>
-              <button onClick={() => void runEditedCode()} disabled={runnerEntry?.loading}>
-                {runnerEntry?.loading
-                  ? tr(lang, 'Executing...', '执行中...')
-                  : tr(lang, 'Execute', '执行')}
-              </button>
-            </div>
-            {runnerEntry?.loading && (
-              <pre className="runner-result loading">{tr(lang, 'Executing...', '执行中...')}</pre>
-            )}
-            {runnerEntry?.result && <pre className="runner-result success">{runnerEntry.result}</pre>}
-            {runnerEntry?.error && <pre className="runner-result error">{runnerEntry.error}</pre>}
-          </div>
-        </div>
-      )}
     </section>
   )
 }
