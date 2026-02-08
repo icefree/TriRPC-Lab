@@ -593,7 +593,6 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
               <tr>
                 <th>{tr(lang, 'Method', '方法')}</th>
                 <th>{tr(lang, 'Description', '说明')}</th>
-                <th>{tr(lang, 'Notes', '备注')}</th>
                 <th>ethers.js</th>
                 <th>viem</th>
                 <th>wagmi</th>
@@ -606,7 +605,6 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                     <code>{item.method}</code>
                   </td>
                   <td>{tr(lang, item.descEn, item.descZh)}</td>
-                  <td>{item.noteEn ? tr(lang, item.noteEn, item.noteZh ?? item.noteEn) : '-'}</td>
                   <td>
                     <code>{methodLibraryMapping(item.method).ethers}</code>
                   </td>
