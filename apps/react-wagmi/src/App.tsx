@@ -342,6 +342,302 @@ function QuickLookupTable({ lang }: { lang: Lang }) {
   )
 }
 
+function methodLibraryMapping(method: string): { ethers: string; viem: string; wagmi: string } {
+  const map: Record<string, { ethers: string; viem: string; wagmi: string }> = {
+    eth_chainId: {
+      ethers: 'provider.getNetwork().chainId',
+      viem: 'publicClient.getChainId()',
+      wagmi: 'useChainId()',
+    },
+    eth_blockNumber: {
+      ethers: 'provider.getBlockNumber()',
+      viem: 'publicClient.getBlockNumber()',
+      wagmi: 'useBlockNumber()',
+    },
+    eth_getBalance: {
+      ethers: 'provider.getBalance(address)',
+      viem: 'publicClient.getBalance({ address })',
+      wagmi: 'useBalance({ address })',
+    },
+    eth_getTransactionCount: {
+      ethers: 'provider.getTransactionCount(address)',
+      viem: 'publicClient.getTransactionCount({ address })',
+      wagmi: 'useTransactionCount({ address })',
+    },
+    eth_getCode: {
+      ethers: 'provider.getCode(address)',
+      viem: 'publicClient.getCode({ address })',
+      wagmi: 'useBytecode({ address })',
+    },
+    eth_getStorageAt: {
+      ethers: 'provider.getStorage(address, slot)',
+      viem: 'publicClient.getStorageAt({ address, slot })',
+      wagmi: 'useStorageAt({ address, slot })',
+    },
+    eth_getBlockByNumber: {
+      ethers: 'provider.getBlock(blockNumber)',
+      viem: "publicClient.getBlock({ blockNumber })",
+      wagmi: 'useBlock({ blockNumber })',
+    },
+    eth_getBlockByHash: {
+      ethers: 'provider.getBlock(blockHash)',
+      viem: "publicClient.getBlock({ blockHash })",
+      wagmi: 'useBlock({ blockHash })',
+    },
+    eth_getBlockTransactionCountByNumber: {
+      ethers: "provider.send('eth_getBlockTransactionCountByNumber', ...)",
+      viem: "publicClient.request({ method: 'eth_getBlockTransactionCountByNumber' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    eth_getUncleCountByBlockNumber: {
+      ethers: "provider.send('eth_getUncleCountByBlockNumber', ...)",
+      viem: "publicClient.request({ method: 'eth_getUncleCountByBlockNumber' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    net_version: {
+      ethers: "provider.send('net_version', [])",
+      viem: "publicClient.request({ method: 'net_version' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    web3_clientVersion: {
+      ethers: "provider.send('web3_clientVersion', [])",
+      viem: "publicClient.request({ method: 'web3_clientVersion' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    eth_getTransactionByHash: {
+      ethers: 'provider.getTransaction(hash)',
+      viem: 'publicClient.getTransaction({ hash })',
+      wagmi: 'useTransaction({ hash })',
+    },
+    eth_getTransactionByBlockNumberAndIndex: {
+      ethers: "provider.send('eth_getTransactionByBlockNumberAndIndex', ...)",
+      viem: "publicClient.request({ method: 'eth_getTransactionByBlockNumberAndIndex' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    eth_getTransactionByBlockHashAndIndex: {
+      ethers: "provider.send('eth_getTransactionByBlockHashAndIndex', ...)",
+      viem: "publicClient.request({ method: 'eth_getTransactionByBlockHashAndIndex' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    eth_getTransactionReceipt: {
+      ethers: 'provider.getTransactionReceipt(hash)',
+      viem: 'publicClient.getTransactionReceipt({ hash })',
+      wagmi: 'useTransactionReceipt({ hash })',
+    },
+    eth_getLogs: {
+      ethers: 'provider.getLogs(filter)',
+      viem: 'publicClient.getLogs(filter)',
+      wagmi: 'useLogs(filter)',
+    },
+    eth_newFilter: {
+      ethers: "provider.send('eth_newFilter', [filter])",
+      viem: "publicClient.createEventFilter(...)",
+      wagmi: 'watchContractEvent(...)',
+    },
+    eth_getFilterChanges: {
+      ethers: "provider.send('eth_getFilterChanges', [id])",
+      viem: "publicClient.getFilterChanges({ filter })",
+      wagmi: 'watch* callbacks',
+    },
+    eth_uninstallFilter: {
+      ethers: "provider.send('eth_uninstallFilter', [id])",
+      viem: "publicClient.uninstallFilter({ filter })",
+      wagmi: 'unwatch()',
+    },
+    eth_call: {
+      ethers: 'provider.call(tx) / contract.method.staticCall()',
+      viem: 'publicClient.call(...) / readContract(...)',
+      wagmi: 'useReadContract(...)',
+    },
+    eth_estimateGas: {
+      ethers: 'provider.estimateGas(tx)',
+      viem: 'publicClient.estimateGas(tx)',
+      wagmi: 'estimateGas(config, tx)',
+    },
+    eth_gasPrice: {
+      ethers: 'provider.getFeeData().gasPrice',
+      viem: 'publicClient.getGasPrice()',
+      wagmi: 'useGasPrice()',
+    },
+    eth_feeHistory: {
+      ethers: "provider.send('eth_feeHistory', ...)",
+      viem: 'publicClient.getFeeHistory(...)',
+      wagmi: 'getPublicClient().getFeeHistory(...)',
+    },
+    eth_maxPriorityFeePerGas: {
+      ethers: "provider.send('eth_maxPriorityFeePerGas', [])",
+      viem: 'publicClient.estimateMaxPriorityFeePerGas()',
+      wagmi: 'getPublicClient().estimateMaxPriorityFeePerGas()',
+    },
+    eth_sendTransaction: {
+      ethers: 'signer.sendTransaction(tx)',
+      viem: 'walletClient.sendTransaction(tx)',
+      wagmi: 'useSendTransaction()',
+    },
+    eth_sendRawTransaction: {
+      ethers: 'provider.broadcastTransaction(rawTx)',
+      viem: 'publicClient.sendRawTransaction({ serializedTransaction })',
+      wagmi: 'getPublicClient().sendRawTransaction(...)',
+    },
+    eth_signTransaction: {
+      ethers: 'signer.signTransaction(tx)',
+      viem: 'walletClient.signTransaction(tx)',
+      wagmi: 'signTransaction(config, tx)',
+    },
+    eth_sign: {
+      ethers: "provider.send('eth_sign', [address, msg])",
+      viem: "walletClient.request({ method: 'eth_sign', ... })",
+      wagmi: "connector.getProvider().request({ method: 'eth_sign' })",
+    },
+    personal_sign: {
+      ethers: 'signer.signMessage(message)',
+      viem: 'walletClient.signMessage({ message })',
+      wagmi: 'useSignMessage()',
+    },
+    personal_ecRecover: {
+      ethers: 'verifyMessage(message, signature)',
+      viem: 'recoverMessageAddress({ message, signature })',
+      wagmi: 'recoverMessageAddress(...)',
+    },
+    eth_signTypedData: {
+      ethers: "provider.send('eth_signTypedData', ...)",
+      viem: "walletClient.request({ method: 'eth_signTypedData', ... })",
+      wagmi: "connector.getProvider().request({ method: 'eth_signTypedData' })",
+    },
+    eth_signTypedData_v3: {
+      ethers: "provider.send('eth_signTypedData_v3', ...)",
+      viem: "walletClient.request({ method: 'eth_signTypedData_v3', ... })",
+      wagmi: "connector.getProvider().request({ method: 'eth_signTypedData_v3' })",
+    },
+    eth_signTypedData_v4: {
+      ethers: 'signer.signTypedData(domain, types, value)',
+      viem: 'walletClient.signTypedData({ domain, types, message })',
+      wagmi: 'useSignTypedData()',
+    },
+    eth_requestAccounts: {
+      ethers: "provider.send('eth_requestAccounts', [])",
+      viem: 'walletClient.requestAddresses()',
+      wagmi: 'useConnect()',
+    },
+    eth_accounts: {
+      ethers: 'provider.listAccounts()',
+      viem: "walletClient.request({ method: 'eth_accounts' })",
+      wagmi: 'useAccount()',
+    },
+    wallet_switchEthereumChain: {
+      ethers: "provider.send('wallet_switchEthereumChain', [{ chainId }])",
+      viem: 'walletClient.switchChain({ id })',
+      wagmi: 'useSwitchChain()',
+    },
+    wallet_addEthereumChain: {
+      ethers: "provider.send('wallet_addEthereumChain', [chain])",
+      viem: "walletClient.request({ method: 'wallet_addEthereumChain', ... })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    wallet_watchAsset: {
+      ethers: "provider.send('wallet_watchAsset', [params])",
+      viem: "walletClient.request({ method: 'wallet_watchAsset', ... })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    wallet_getPermissions: {
+      ethers: "provider.send('wallet_getPermissions', [])",
+      viem: "walletClient.request({ method: 'wallet_getPermissions' })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    wallet_requestPermissions: {
+      ethers: "provider.send('wallet_requestPermissions', [params])",
+      viem: "walletClient.request({ method: 'wallet_requestPermissions', ... })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    wallet_revokePermissions: {
+      ethers: "provider.send('wallet_revokePermissions', [params])",
+      viem: "walletClient.request({ method: 'wallet_revokePermissions', ... })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    wallet_getCapabilities: {
+      ethers: "provider.send('wallet_getCapabilities', [address])",
+      viem: "walletClient.request({ method: 'wallet_getCapabilities', ... })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    wallet_sendCalls: {
+      ethers: "provider.send('wallet_sendCalls', [params])",
+      viem: "walletClient.request({ method: 'wallet_sendCalls', ... })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    wallet_getCallsStatus: {
+      ethers: "provider.send('wallet_getCallsStatus', [id])",
+      viem: "walletClient.request({ method: 'wallet_getCallsStatus', ... })",
+      wagmi: 'connector.getProvider().request(...)',
+    },
+    eth_subscribe: {
+      ethers: 'provider.on(event, listener)',
+      viem: 'watchBlocks()/watchEvent()/watchPendingTransactions()',
+      wagmi: 'watchBlockNumber()/watchContractEvent()',
+    },
+    eth_unsubscribe: {
+      ethers: 'provider.off(...)',
+      viem: 'unwatch()',
+      wagmi: 'unwatch()',
+    },
+    newHeads: {
+      ethers: "provider.on('block', ...)",
+      viem: 'watchBlocks(...)',
+      wagmi: 'watchBlockNumber(...)',
+    },
+    logs: {
+      ethers: 'provider.on(filter, ...)',
+      viem: 'watchEvent(...)',
+      wagmi: 'watchContractEvent(...)',
+    },
+    newPendingTransactions: {
+      ethers: "provider.on('pending', ...)",
+      viem: 'watchPendingTransactions(...)',
+      wagmi: 'watchPendingTransactions(...)',
+    },
+    debug_traceTransaction: {
+      ethers: "provider.send('debug_traceTransaction', [hash, opts])",
+      viem: "publicClient.request({ method: 'debug_traceTransaction', ... })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    debug_traceBlockByNumber: {
+      ethers: "provider.send('debug_traceBlockByNumber', [block, opts])",
+      viem: "publicClient.request({ method: 'debug_traceBlockByNumber', ... })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    trace_transaction: {
+      ethers: "provider.send('trace_transaction', [hash])",
+      viem: "publicClient.request({ method: 'trace_transaction', ... })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    trace_block: {
+      ethers: "provider.send('trace_block', [block])",
+      viem: "publicClient.request({ method: 'trace_block', ... })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    trace_call: {
+      ethers: "provider.send('trace_call', [tx, modes, block])",
+      viem: "publicClient.request({ method: 'trace_call', ... })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    txpool_status: {
+      ethers: "provider.send('txpool_status', [])",
+      viem: "publicClient.request({ method: 'txpool_status' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    txpool_content: {
+      ethers: "provider.send('txpool_content', [])",
+      viem: "publicClient.request({ method: 'txpool_content' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+    txpool_inspect: {
+      ethers: "provider.send('txpool_inspect', [])",
+      viem: "publicClient.request({ method: 'txpool_inspect' })",
+      wagmi: 'getPublicClient().request(...)',
+    },
+  }
+  return map[method] ?? { ethers: 'N/A', viem: 'N/A', wagmi: 'N/A' }
+}
+
 function RpcReferencePage({ lang }: { lang: Lang }) {
   return (
     <section className="card rpc-page">
@@ -363,6 +659,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                   <th>{tr(lang, 'Method', '方法')}</th>
                   <th>{tr(lang, 'Description', '说明')}</th>
                   <th>{tr(lang, 'Notes', '备注')}</th>
+                  <th>ethers.js</th>
+                  <th>viem</th>
+                  <th>wagmi</th>
                 </tr>
               </thead>
               <tbody>
@@ -373,6 +672,15 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                     </td>
                     <td>{tr(lang, item.descEn, item.descZh)}</td>
                     <td>{item.noteEn ? tr(lang, item.noteEn, item.noteZh ?? item.noteEn) : '-'}</td>
+                    <td>
+                      <code>{methodLibraryMapping(item.method).ethers}</code>
+                    </td>
+                    <td>
+                      <code>{methodLibraryMapping(item.method).viem}</code>
+                    </td>
+                    <td>
+                      <code>{methodLibraryMapping(item.method).wagmi}</code>
+                    </td>
                   </tr>
                 ))}
               </tbody>
