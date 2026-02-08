@@ -968,13 +968,23 @@ function App() {
       <header className="header card">
         <div className="header-top">
           <h1>{page === 'dashboard' ? tr(lang, 'API Comparison Dashboard', 'API 对比面板') : tr(lang, 'RPC Quick Reference', 'RPC 速查页面')}</h1>
-          <div className="lang-switch">
-            <button onClick={() => setLang('en')} disabled={lang === 'en'}>
-              English
-            </button>
-            <button onClick={() => setLang('zh')} disabled={lang === 'zh'}>
-              中文
-            </button>
+          <div className="header-actions">
+            <div className="lang-switch">
+              <button onClick={() => setLang('en')} disabled={lang === 'en'}>
+                English
+              </button>
+              <button onClick={() => setLang('zh')} disabled={lang === 'zh'}>
+                中文
+              </button>
+            </div>
+            <a
+              className="github-link"
+              href="https://github.com/icefree/TriRPC-Lab"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {tr(lang, 'GitHub Repository', 'GitHub 仓库')}
+            </a>
           </div>
         </div>
         <p>
