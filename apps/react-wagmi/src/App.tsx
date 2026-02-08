@@ -657,13 +657,14 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     if (mode === 'rpc') {
       return `const method = '${method}'\nconst params = ${safeParams}\nreturn await requestRpc(method, params)`
     }
+    const mapping = methodLibraryMapping(method)[mode]
     const modeRunner =
       mode === 'ethers'
         ? 'runEthersMethod'
         : mode === 'viem'
           ? 'runViemMethod'
           : 'runWagmiMethod'
-    return `const method = '${method}'\nconst params = ${safeParams}\nreturn await ${modeRunner}(method, params)`
+    return `// ${mapping}\nconst method = '${method}'\nconst params = ${safeParams}\nreturn await ${modeRunner}(method, params)`
   }
 
   const normalizeRunnerParams = (params: unknown): unknown[] => {
