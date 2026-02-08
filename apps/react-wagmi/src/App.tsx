@@ -754,10 +754,10 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         'custom',
         'wagmiPublicClient',
         'wagmiWalletClient',
-        'viemParseEther',
-        'viemFormatEther',
-        'viemParseUnits',
-        'viemFormatUnits',
+        'parseEther',
+        'formatEther',
+        'parseUnits',
+        'formatUnits',
         `"use strict"; return (async () => { ${code} })();`,
       ) as (
         provider: Eip1193Provider,
@@ -767,10 +767,10 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         custom: typeof import('viem').custom,
         wagmiPublicClient: ReturnType<typeof usePublicClient>,
         wagmiWalletClient: ReturnType<typeof useWalletClient>['data'],
-        viemParseEther: typeof import('viem').parseEther,
-        viemFormatEther: typeof import('viem').formatEther,
-        viemParseUnits: typeof import('viem').parseUnits,
-        viemFormatUnits: typeof import('viem').formatUnits,
+        parseEther: typeof import('viem').parseEther,
+        formatEther: typeof import('viem').formatEther,
+        parseUnits: typeof import('viem').parseUnits,
+        formatUnits: typeof import('viem').formatUnits,
       ) => Promise<unknown>
 
       const result = await fn(
@@ -923,8 +923,8 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
             <p className="runner-tip">
               {tr(
                 lang,
-                'You can edit the code below before execution. Return a value to display the result. Built-ins: viemParseEther, viemFormatEther, viemParseUnits, viemFormatUnits.',
-                '可先编辑下面代码再执行。请返回一个值用于展示结果。默认可用：viemParseEther、viemFormatEther、viemParseUnits、viemFormatUnits。',
+                'You can edit the code below before execution. Return a value to display the result. Built-ins: parseEther, formatEther, parseUnits, formatUnits.',
+                '可先编辑下面代码再执行。请返回一个值用于展示结果。默认可用：parseEther、formatEther、parseUnits、formatUnits。',
               )}
             </p>
             <textarea
