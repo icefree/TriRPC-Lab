@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { BrowserProvider, Contract, parseEther as parseEtherEthers } from 'ethers'
+import { BrowserProvider, Contract, ContractFactory, parseEther as parseEtherEthers } from 'ethers'
 import {
   createPublicClient,
   createWalletClient,
@@ -117,6 +117,9 @@ const COUNTER_ABI = [
     outputs: [],
   },
 ] as const
+
+const COUNTER_BYTECODE =
+  '0x6080604052348015600e575f5ffd5b506101818061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c8063a87d942c14610038578063d09de08a14610056575b5f5ffd5b610040610060565b60405161004d91906100d2565b60405180910390f35b61005e610068565b005b5f5f54905090565b60015f5f8282546100799190610118565b925050819055507f20d8a6f5a693f9d1d627a598e8820f7a55ee74c183aa8f1a30e8d4e8dd9a8d845f546040516100b091906100d2565b60405180910390a1565b5f819050919050565b6100cc816100ba565b82525050565b5f6020820190506100e55f8301846100c3565b92915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f610122826100ba565b915061012d836100ba565b9250828201905080821115610145576101446100eb565b5b9291505056fea2646970667358221220dd91739997e77f1384f3d83e9f64fdf90eb8cc3751e42676e812f371c50f507464736f6c63430008210033'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const
 
@@ -1711,6 +1714,8 @@ function App() {
   const [valueInput, setValueInput] = useState('0.001')
   const [txHashInput, setTxHashInput] = useState('')
   const [contractInput, setContractInput] = useState('')
+  const [isDeployingCounter, setIsDeployingCounter] = useState(false)
+  const [deployCounterError, setDeployCounterError] = useState('')
 
   const balanceAddress = useMemo(
     () => (isAddress(balanceInput) ? (balanceInput as Hex) : undefined),
@@ -1733,6 +1738,35 @@ function App() {
     () => connectors.find((connector) => connector.type === 'injected') ?? connectors[0],
     [connectors],
   )
+
+  const deployCounterContract = async () => {
+    try {
+      setDeployCounterError('')
+      setIsDeployingCounter(true)
+      const injected = getInjectedProvider()
+      if (!injected) {
+        throw new Error(tr(lang, 'No injected wallet found', '未检测到浏览器钱包'))
+      }
+      const provider = new BrowserProvider(injected)
+      await provider.send('eth_requestAccounts', [])
+      const signer = await provider.getSigner()
+      const factory = new ContractFactory(COUNTER_ABI, COUNTER_BYTECODE, signer)
+      const contract = await factory.deploy()
+      await contract.waitForDeployment()
+      const deployedAddress = await contract.getAddress()
+      setContractInput(deployedAddress)
+      console.info('[TriRPC] Counter deployed', {
+        address: deployedAddress,
+        txHash: contract.deploymentTransaction()?.hash,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setDeployCounterError(message)
+      console.error('[TriRPC] Counter deploy failed', { error: message })
+    } finally {
+      setIsDeployingCounter(false)
+    }
+  }
 
   return (
     <main className="page">
@@ -1846,11 +1880,23 @@ function App() {
               </label>
               <label>
                 {tr(lang, 'Counter Contract Address', 'Counter 合约地址')}
-                <input
-                  placeholder="0x..."
-                  value={contractInput}
-                  onChange={(event) => setContractInput(event.target.value.trim())}
-                />
+                <div className="input-with-action">
+                  <input
+                    placeholder="0x..."
+                    value={contractInput}
+                    onChange={(event) => setContractInput(event.target.value.trim())}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void deployCounterContract()}
+                    disabled={isDeployingCounter}
+                  >
+                    {isDeployingCounter
+                      ? tr(lang, 'Deploying...', '部署中...')
+                      : tr(lang, 'Deploy Counter', '部署 Counter')}
+                  </button>
+                </div>
+                {deployCounterError && <span className="error">{deployCounterError}</span>}
               </label>
             </div>
           </section>
