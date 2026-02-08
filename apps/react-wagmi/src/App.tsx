@@ -135,6 +135,87 @@ function ActionBlock({
   )
 }
 
+function QuickLookupTable({ lang }: { lang: Lang }) {
+  const rows = [
+    {
+      scenarioEn: 'Connect wallet / request account',
+      scenarioZh: '连接钱包 / 请求账户授权',
+      ethers: "provider.send('eth_requestAccounts', [])",
+      viem: 'walletClient.requestAddresses()',
+      wagmi: 'useConnect().connect({ connector })',
+    },
+    {
+      scenarioEn: 'Chain & block',
+      scenarioZh: '链 ID 与区块',
+      ethers: 'provider.getNetwork(); provider.getBlockNumber()',
+      viem: 'publicClient.getChainId(); publicClient.getBlockNumber()',
+      wagmi: 'useChainId(); useBlockNumber({ watch: true })',
+    },
+    {
+      scenarioEn: 'Balance query',
+      scenarioZh: '余额查询',
+      ethers: 'provider.getBalance(address)',
+      viem: 'publicClient.getBalance({ address })',
+      wagmi: 'useBalance({ address })',
+    },
+    {
+      scenarioEn: 'Send native transfer',
+      scenarioZh: '发起原生转账',
+      ethers: 'signer.sendTransaction({ to, value })',
+      viem: 'walletClient.sendTransaction({ account, to, value })',
+      wagmi: 'useSendTransaction().sendTransaction({ to, value })',
+    },
+    {
+      scenarioEn: 'Query transaction / receipt',
+      scenarioZh: '查询交易 / 回执',
+      ethers: 'getTransaction(hash); getTransactionReceipt(hash)',
+      viem: "getTransaction({ hash }); getTransactionReceipt({ hash })",
+      wagmi: 'useTransaction({ hash }); useTransactionReceipt({ hash })',
+    },
+    {
+      scenarioEn: 'Contract read/write',
+      scenarioZh: '合约读写',
+      ethers: 'contract.getCount(); contract.increment()',
+      viem: "readContract(...); writeContract(..., 'increment')",
+      wagmi: 'useReadContract(...); useWriteContract(...)',
+    },
+  ]
+
+  return (
+    <section className="card quick-lookup">
+      <h2>{tr(lang, 'Quick Lookup Table', '快速查询表')}</h2>
+      <div className="quick-table-wrap">
+        <table className="quick-table">
+          <thead>
+            <tr>
+              <th>{tr(lang, 'Scenario', '场景')}</th>
+              <th>ethers.js</th>
+              <th>viem</th>
+              <th>wagmi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.scenarioEn}>
+                <td>{tr(lang, row.scenarioEn, row.scenarioZh)}</td>
+                <td>
+                  <code>{row.ethers}</code>
+                </td>
+                <td>
+                  <code>{row.viem}</code>
+                </td>
+                <td>
+                  <code>{row.wagmi}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const [lang, setLang] = useState<Lang>('en')
   const [balanceInput, setBalanceInput] = useState('')
@@ -175,6 +256,8 @@ function App() {
           )}
         </p>
       </header>
+
+      <QuickLookupTable lang={lang} />
 
       <section className="card controls">
         <h2>{tr(lang, 'Shared Inputs', '共享输入')}</h2>
