@@ -34,6 +34,11 @@
   gap: 8px;
 }
 
+.page-switch {
+  display: flex;
+  gap: 8px;
+}
+
 .controls h2,
 .panel h2 {
   margin: 0 0 12px;
@@ -74,6 +79,29 @@
   padding: 2px 4px;
   border-radius: 4px;
   word-break: break-word;
+}
+
+.rpc-page {
+  display: grid;
+  gap: 14px;
+}
+
+.rpc-note {
+  color: #475569;
+}
+
+.rpc-category {
+  display: grid;
+  gap: 8px;
+}
+
+.rpc-category h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.rpc-table {
+  min-width: 980px;
 }
 
 .controls-grid {

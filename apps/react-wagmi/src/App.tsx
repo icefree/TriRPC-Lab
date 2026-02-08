@@ -28,6 +28,7 @@ import './App.css'
 
 type Hex = `0x${string}`
 type Lang = 'en' | 'zh'
+type Page = 'dashboard' | 'reference'
 
 type Eip1193Provider = {
   request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>
@@ -41,6 +42,20 @@ type ActionCode = {
   queryTx: string
   readContract: string
   writeContract: string
+}
+
+type RpcMethod = {
+  method: string
+  descEn: string
+  descZh: string
+  noteEn?: string
+  noteZh?: string
+}
+
+type RpcCategory = {
+  titleEn: string
+  titleZh: string
+  methods: RpcMethod[]
 }
 
 const CODES: Record<'ethers' | 'viem' | 'wagmi', ActionCode> = {
@@ -91,6 +106,117 @@ const COUNTER_ABI = [
 ] as const
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const
+
+const RPC_REFERENCE: RpcCategory[] = [
+  {
+    titleEn: 'Core Node Read APIs',
+    titleZh: '核心节点读取 API',
+    methods: [
+      { method: 'eth_chainId', descEn: 'Current chain ID', descZh: '当前链 ID' },
+      { method: 'eth_blockNumber', descEn: 'Latest block number', descZh: '最新区块高度' },
+      { method: 'eth_getBalance', descEn: 'Native balance by address', descZh: '按地址查原生币余额' },
+      { method: 'eth_getTransactionCount', descEn: 'Nonce by address', descZh: '按地址查 nonce' },
+      { method: 'eth_getCode', descEn: 'Contract code at address', descZh: '查询地址上的合约代码' },
+      { method: 'eth_getStorageAt', descEn: 'Storage slot value', descZh: '读取存储槽位' },
+      { method: 'eth_getBlockByNumber', descEn: 'Block detail by number', descZh: '按块高查询区块详情' },
+      { method: 'eth_getBlockByHash', descEn: 'Block detail by hash', descZh: '按 hash 查询区块详情' },
+      { method: 'eth_getBlockTransactionCountByNumber', descEn: 'Tx count in block', descZh: '按块高查交易数' },
+      { method: 'eth_getUncleCountByBlockNumber', descEn: 'Uncle count', descZh: '查询叔块数量' },
+      { method: 'net_version', descEn: 'Network ID', descZh: '网络 ID' },
+      { method: 'web3_clientVersion', descEn: 'Node client version', descZh: '客户端版本信息' },
+    ],
+  },
+  {
+    titleEn: 'Transaction & Receipt Query',
+    titleZh: '交易与回执查询',
+    methods: [
+      { method: 'eth_getTransactionByHash', descEn: 'Transaction by hash', descZh: '按 hash 查交易' },
+      {
+        method: 'eth_getTransactionByBlockNumberAndIndex',
+        descEn: 'Transaction by block/index',
+        descZh: '按块高和索引查交易',
+      },
+      {
+        method: 'eth_getTransactionByBlockHashAndIndex',
+        descEn: 'Transaction by block hash/index',
+        descZh: '按块 hash 和索引查交易',
+      },
+      { method: 'eth_getTransactionReceipt', descEn: 'Receipt by hash', descZh: '按 hash 查回执' },
+      { method: 'eth_getLogs', descEn: 'Filter logs/events', descZh: '按条件查询日志事件' },
+      { method: 'eth_newFilter', descEn: 'Create log filter', descZh: '创建日志过滤器' },
+      { method: 'eth_getFilterChanges', descEn: 'Poll filter updates', descZh: '轮询过滤器变化' },
+      { method: 'eth_uninstallFilter', descEn: 'Remove filter', descZh: '卸载过滤器' },
+    ],
+  },
+  {
+    titleEn: 'Contract Call & Gas',
+    titleZh: '合约调用与 Gas',
+    methods: [
+      { method: 'eth_call', descEn: 'Read-only contract call', descZh: '只读合约调用' },
+      { method: 'eth_estimateGas', descEn: 'Estimate gas usage', descZh: '估算 Gas 使用量' },
+      { method: 'eth_gasPrice', descEn: 'Legacy gas price', descZh: '传统 gasPrice' },
+      { method: 'eth_feeHistory', descEn: 'EIP-1559 fee history', descZh: 'EIP-1559 费率历史' },
+      { method: 'eth_maxPriorityFeePerGas', descEn: 'Suggested priority fee', descZh: '建议小费' },
+    ],
+  },
+  {
+    titleEn: 'Send Transaction & Signing',
+    titleZh: '发送交易与签名',
+    methods: [
+      { method: 'eth_sendTransaction', descEn: 'Wallet signs and sends', descZh: '钱包代签并发送' },
+      { method: 'eth_sendRawTransaction', descEn: 'Broadcast signed raw tx', descZh: '广播已签名交易' },
+      { method: 'eth_signTransaction', descEn: 'Sign tx without sending', descZh: '只签名交易不发送' },
+      { method: 'eth_sign', descEn: 'Sign bytes (legacy)', descZh: '签名字节（较老）' },
+      { method: 'personal_sign', descEn: 'Personal message signing', descZh: '个人消息签名' },
+      { method: 'personal_ecRecover', descEn: 'Recover signer from signature', descZh: '从签名恢复地址' },
+      { method: 'eth_signTypedData', descEn: 'Typed data sign (legacy)', descZh: '结构化签名（旧）' },
+      { method: 'eth_signTypedData_v3', descEn: 'Typed data sign v3', descZh: '结构化签名 v3' },
+      { method: 'eth_signTypedData_v4', descEn: 'Typed data sign v4 (EIP-712)', descZh: '结构化签名 v4（EIP-712）' },
+    ],
+  },
+  {
+    titleEn: 'Wallet / Provider Extensions',
+    titleZh: '钱包 / Provider 扩展',
+    methods: [
+      { method: 'eth_requestAccounts', descEn: 'Request account access', descZh: '请求账户授权' },
+      { method: 'eth_accounts', descEn: 'List exposed accounts', descZh: '返回已授权账户' },
+      { method: 'wallet_switchEthereumChain', descEn: 'Switch chain in wallet', descZh: '钱包切换网络' },
+      { method: 'wallet_addEthereumChain', descEn: 'Add a custom chain', descZh: '钱包添加网络' },
+      { method: 'wallet_watchAsset', descEn: 'Prompt token watch', descZh: '添加代币观察' },
+      { method: 'wallet_getPermissions', descEn: 'Current wallet permissions', descZh: '查询钱包权限' },
+      { method: 'wallet_requestPermissions', descEn: 'Request wallet permissions', descZh: '申请钱包权限' },
+      { method: 'wallet_revokePermissions', descEn: 'Revoke permissions', descZh: '撤销钱包权限' },
+      { method: 'wallet_getCapabilities', descEn: 'Wallet capability introspection', descZh: '查询钱包能力' },
+      { method: 'wallet_sendCalls', descEn: 'Batch calls (wallet-specific)', descZh: '钱包批量调用（扩展）' },
+      { method: 'wallet_getCallsStatus', descEn: 'Query batch call status', descZh: '查询批量调用状态' },
+    ],
+  },
+  {
+    titleEn: 'WebSocket / Subscription',
+    titleZh: 'WebSocket 订阅',
+    methods: [
+      { method: 'eth_subscribe', descEn: 'Subscribe to new heads/logs/pending tx', descZh: '订阅新区块/日志/pending 交易' },
+      { method: 'eth_unsubscribe', descEn: 'Cancel subscription', descZh: '取消订阅' },
+      { method: 'newHeads', descEn: 'New block header stream', descZh: '新区块头订阅类型', noteEn: 'Subscription type', noteZh: '订阅类型' },
+      { method: 'logs', descEn: 'Filtered logs stream', descZh: '过滤日志订阅类型', noteEn: 'Subscription type', noteZh: '订阅类型' },
+      { method: 'newPendingTransactions', descEn: 'Pending tx stream', descZh: '待打包交易订阅类型', noteEn: 'Subscription type', noteZh: '订阅类型' },
+    ],
+  },
+  {
+    titleEn: 'Debug / Trace / TxPool (Client-specific)',
+    titleZh: '调试 / 追踪 / TxPool（客户端扩展）',
+    methods: [
+      { method: 'debug_traceTransaction', descEn: 'Execution trace for tx', descZh: '交易执行追踪' },
+      { method: 'debug_traceBlockByNumber', descEn: 'Trace all tx in block', descZh: '追踪整块交易' },
+      { method: 'trace_transaction', descEn: 'Parity-style tx trace', descZh: 'Parity 风格交易追踪' },
+      { method: 'trace_block', descEn: 'Trace block', descZh: '区块追踪' },
+      { method: 'trace_call', descEn: 'Trace simulated call', descZh: '追踪模拟调用' },
+      { method: 'txpool_status', descEn: 'TxPool pending/queued count', descZh: '交易池状态' },
+      { method: 'txpool_content', descEn: 'TxPool detailed content', descZh: '交易池详情' },
+      { method: 'txpool_inspect', descEn: 'TxPool compact view', descZh: '交易池简表' },
+    ],
+  },
+]
 
 function tr(lang: Lang, en: string, zh: string) {
   return lang === 'en' ? en : zh
@@ -216,7 +342,50 @@ function QuickLookupTable({ lang }: { lang: Lang }) {
   )
 }
 
+function RpcReferencePage({ lang }: { lang: Lang }) {
+  return (
+    <section className="card rpc-page">
+      <h2>{tr(lang, 'RPC Method Reference (Extended)', 'RPC 方法速查（扩展版）')}</h2>
+      <p className="rpc-note">
+        {tr(
+          lang,
+          'This is a practical superset. Availability depends on wallet/client implementation.',
+          '这是实用的“尽量全”集合，具体可用性取决于钱包与节点客户端实现。',
+        )}
+      </p>
+      {RPC_REFERENCE.map((category) => (
+        <div className="rpc-category" key={category.titleEn}>
+          <h3>{tr(lang, category.titleEn, category.titleZh)}</h3>
+          <div className="quick-table-wrap">
+            <table className="quick-table rpc-table">
+              <thead>
+                <tr>
+                  <th>{tr(lang, 'Method', '方法')}</th>
+                  <th>{tr(lang, 'Description', '说明')}</th>
+                  <th>{tr(lang, 'Notes', '备注')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {category.methods.map((item) => (
+                  <tr key={`${category.titleEn}-${item.method}`}>
+                    <td>
+                      <code>{item.method}</code>
+                    </td>
+                    <td>{tr(lang, item.descEn, item.descZh)}</td>
+                    <td>{item.noteEn ? tr(lang, item.noteEn, item.noteZh ?? item.noteEn) : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 function App() {
+  const [page, setPage] = useState<Page>('dashboard')
   const [lang, setLang] = useState<Lang>('en')
   const [balanceInput, setBalanceInput] = useState('')
   const [toInput, setToInput] = useState('')
@@ -238,7 +407,7 @@ function App() {
     <main className="page">
       <header className="header card">
         <div className="header-top">
-          <h1>{tr(lang, 'API Comparison Dashboard', 'API 对比面板')}</h1>
+          <h1>{page === 'dashboard' ? tr(lang, 'API Comparison Dashboard', 'API 对比面板') : tr(lang, 'RPC Quick Reference', 'RPC 速查页面')}</h1>
           <div className="lang-switch">
             <button onClick={() => setLang('en')} disabled={lang === 'en'}>
               English
@@ -256,81 +425,95 @@ function App() {
           )}
         </p>
       </header>
+      <section className="card page-switch">
+        <button onClick={() => setPage('dashboard')} disabled={page === 'dashboard'}>
+          {tr(lang, 'Dashboard', '对比面板')}
+        </button>
+        <button onClick={() => setPage('reference')} disabled={page === 'reference'}>
+          {tr(lang, 'RPC Reference', 'RPC 速查')}
+        </button>
+      </section>
 
-      <QuickLookupTable lang={lang} />
+      {page === 'dashboard' ? (
+        <>
+          <QuickLookupTable lang={lang} />
 
-      <section className="card controls">
-        <h2>{tr(lang, 'Shared Inputs', '共享输入')}</h2>
-        <div className="controls-grid">
-          <label>
-            {tr(lang, 'Balance Address', '余额查询地址')}
-            <input
-              placeholder="0x..."
-              value={balanceInput}
-              onChange={(event) => setBalanceInput(event.target.value.trim())}
-            />
-          </label>
-          <label>
-            {tr(lang, 'Transfer To', '转账目标地址')}
-            <input
-              placeholder="0x..."
-              value={toInput}
-              onChange={(event) => setToInput(event.target.value.trim())}
-            />
-          </label>
-          <label>
-            {tr(lang, 'Transfer Value (ETH)', '转账金额 (ETH)')}
-            <input
-              placeholder="0.001"
+          <section className="card controls">
+            <h2>{tr(lang, 'Shared Inputs', '共享输入')}</h2>
+            <div className="controls-grid">
+              <label>
+                {tr(lang, 'Balance Address', '余额查询地址')}
+                <input
+                  placeholder="0x..."
+                  value={balanceInput}
+                  onChange={(event) => setBalanceInput(event.target.value.trim())}
+                />
+              </label>
+              <label>
+                {tr(lang, 'Transfer To', '转账目标地址')}
+                <input
+                  placeholder="0x..."
+                  value={toInput}
+                  onChange={(event) => setToInput(event.target.value.trim())}
+                />
+              </label>
+              <label>
+                {tr(lang, 'Transfer Value (ETH)', '转账金额 (ETH)')}
+                <input
+                  placeholder="0.001"
+                  value={valueInput}
+                  onChange={(event) => setValueInput(event.target.value.trim())}
+                />
+              </label>
+              <label>
+                {tr(lang, 'Transaction Hash', '交易哈希查询')}
+                <input
+                  placeholder="0x..."
+                  value={txHashInput}
+                  onChange={(event) => setTxHashInput(event.target.value.trim())}
+                />
+              </label>
+              <label>
+                {tr(lang, 'Counter Contract Address', 'Counter 合约地址')}
+                <input
+                  placeholder="0x..."
+                  value={contractInput}
+                  onChange={(event) => setContractInput(event.target.value.trim())}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="columns">
+            <EthersPanel
+              lang={lang}
+              balanceAddress={balanceAddress}
+              to={toInput}
               value={valueInput}
-              onChange={(event) => setValueInput(event.target.value.trim())}
+              txHash={txHash}
+              contractAddress={contractAddress}
             />
-          </label>
-          <label>
-            {tr(lang, 'Transaction Hash', '交易哈希查询')}
-            <input
-              placeholder="0x..."
-              value={txHashInput}
-              onChange={(event) => setTxHashInput(event.target.value.trim())}
+            <ViemPanel
+              lang={lang}
+              balanceAddress={balanceAddress}
+              to={toInput}
+              value={valueInput}
+              txHash={txHash}
+              contractAddress={contractAddress}
             />
-          </label>
-          <label>
-            {tr(lang, 'Counter Contract Address', 'Counter 合约地址')}
-            <input
-              placeholder="0x..."
-              value={contractInput}
-              onChange={(event) => setContractInput(event.target.value.trim())}
+            <WagmiPanel
+              lang={lang}
+              balanceAddress={balanceAddress}
+              to={toInput}
+              value={valueInput}
+              txHash={txHash}
+              contractAddress={contractAddress}
             />
-          </label>
-        </div>
-      </section>
-
-      <section className="columns">
-        <EthersPanel
-          lang={lang}
-          balanceAddress={balanceAddress}
-          to={toInput}
-          value={valueInput}
-          txHash={txHash}
-          contractAddress={contractAddress}
-        />
-        <ViemPanel
-          lang={lang}
-          balanceAddress={balanceAddress}
-          to={toInput}
-          value={valueInput}
-          txHash={txHash}
-          contractAddress={contractAddress}
-        />
-        <WagmiPanel
-          lang={lang}
-          balanceAddress={balanceAddress}
-          to={toInput}
-          value={valueInput}
-          txHash={txHash}
-          contractAddress={contractAddress}
-        />
-      </section>
+          </section>
+        </>
+      ) : (
+        <RpcReferencePage lang={lang} />
+      )}
     </main>
   )
 }
