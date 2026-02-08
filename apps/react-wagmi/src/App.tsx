@@ -559,7 +559,24 @@ function methodLibraryMapping(method: string): { ethers: string; viem: string; w
 
 function RpcReferencePage({ lang }: { lang: Lang }) {
   const [activeCategory, setActiveCategory] = useState(0)
+  const [query, setQuery] = useState('')
   const category = RPC_REFERENCE[activeCategory]
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredMethods = category.methods.filter((item) => {
+    if (!normalizedQuery) return true
+    const mapping = methodLibraryMapping(item.method)
+    const target = [
+      item.method,
+      item.descEn,
+      item.descZh,
+      mapping.ethers,
+      mapping.viem,
+      mapping.wagmi,
+    ]
+      .join(' ')
+      .toLowerCase()
+    return target.includes(normalizedQuery)
+  })
 
   return (
     <section className="card rpc-page">
@@ -571,6 +588,17 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
           '这是实用的“尽量全”集合，具体可用性取决于钱包与节点客户端实现。',
         )}
       </p>
+      <div className="rpc-search">
+        <input
+          placeholder={tr(
+            lang,
+            'Search method / description / library mapping...',
+            '搜索方法名 / 说明 / 三库对应写法...',
+          )}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
       <div className="rpc-tabs" role="tablist" aria-label="rpc categories">
         {RPC_REFERENCE.map((item, index) => (
           <button
@@ -599,23 +627,29 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
               </tr>
             </thead>
             <tbody>
-              {category.methods.map((item) => (
-                <tr key={`${category.titleEn}-${item.method}`}>
-                  <td>
-                    <code>{item.method}</code>
-                  </td>
-                  <td>{tr(lang, item.descEn, item.descZh)}</td>
-                  <td>
-                    <code>{methodLibraryMapping(item.method).ethers}</code>
-                  </td>
-                  <td>
-                    <code>{methodLibraryMapping(item.method).viem}</code>
-                  </td>
-                  <td>
-                    <code>{methodLibraryMapping(item.method).wagmi}</code>
-                  </td>
+              {filteredMethods.length > 0 ? (
+                filteredMethods.map((item) => (
+                  <tr key={`${category.titleEn}-${item.method}`}>
+                    <td>
+                      <code>{item.method}</code>
+                    </td>
+                    <td>{tr(lang, item.descEn, item.descZh)}</td>
+                    <td>
+                      <code>{methodLibraryMapping(item.method).ethers}</code>
+                    </td>
+                    <td>
+                      <code>{methodLibraryMapping(item.method).viem}</code>
+                    </td>
+                    <td>
+                      <code>{methodLibraryMapping(item.method).wagmi}</code>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5}>{tr(lang, 'No matching methods.', '没有匹配的方法。')}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

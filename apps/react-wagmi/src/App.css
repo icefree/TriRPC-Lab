@@ -110,6 +110,13 @@
   color: #475569;
 }
 
+.rpc-search input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
 .rpc-category {
   display: grid;
   gap: 8px;
