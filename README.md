@@ -64,6 +64,14 @@ Output file: `reports/compare.md`
 pnpm --filter react-wagmi dev
 ```
 
+## Deploy to GitHub Pages
+This repository includes an Actions workflow at `.github/workflows/deploy-github-pages.yml`.
+
+After pushing to `main`, GitHub will build and publish `apps/react-wagmi` to Pages automatically.
+
+Default URL format:
+- `https://<your-github-username>.github.io/<repo-name>/`
+
 ## Scripts
 - `pnpm build`: build all workspace packages/apps
 - `pnpm typecheck`: type-check all workspace packages/apps
@@ -89,6 +97,12 @@ TriRPC-Lab 是一个最小化 monorepo，用于在同一项目中对比 **ethers
 
 ### 前端演示
 运行：`pnpm --filter react-wagmi dev`
+
+### 部署到 GitHub Pages
+仓库已包含工作流：`.github/workflows/deploy-github-pages.yml`。推送到 `main` 后会自动构建并发布 `apps/react-wagmi`。
+
+默认访问地址格式：
+- `https://<你的 GitHub 用户名>.github.io/<仓库名>/`
 
 ---
 
