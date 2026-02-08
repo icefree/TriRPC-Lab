@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { BrowserProvider, Contract, parseEther as parseEtherEthers } from 'ethers'
+import { BrowserProvider, Contract, formatEther as formatEtherEthers, parseEther as parseEtherEthers } from 'ethers'
 import {
   createPublicClient,
   createWalletClient,
@@ -8,7 +8,9 @@ import {
   formatEther,
   isAddress,
   isHash,
+  parseUnits as parseUnitsViem,
   parseEther,
+  formatUnits as formatUnitsViem,
 } from 'viem'
 import {
   useAccount,
@@ -752,6 +754,12 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         'custom',
         'wagmiPublicClient',
         'wagmiWalletClient',
+        'ethersParseEther',
+        'ethersFormatEther',
+        'viemParseEther',
+        'viemFormatEther',
+        'viemParseUnits',
+        'viemFormatUnits',
         `"use strict"; return (async () => { ${code} })();`,
       ) as (
         provider: Eip1193Provider,
@@ -761,6 +769,12 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         custom: typeof import('viem').custom,
         wagmiPublicClient: ReturnType<typeof usePublicClient>,
         wagmiWalletClient: ReturnType<typeof useWalletClient>['data'],
+        ethersParseEther: typeof import('ethers').parseEther,
+        ethersFormatEther: typeof import('ethers').formatEther,
+        viemParseEther: typeof import('viem').parseEther,
+        viemFormatEther: typeof import('viem').formatEther,
+        viemParseUnits: typeof import('viem').parseUnits,
+        viemFormatUnits: typeof import('viem').formatUnits,
       ) => Promise<unknown>
 
       const result = await fn(
@@ -771,6 +785,12 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         custom,
         wagmiPublicClient,
         wagmiWalletClient,
+        parseEtherEthers,
+        formatEtherEthers,
+        parseEther,
+        formatEther,
+        parseUnitsViem,
+        formatUnitsViem,
       )
 
       setInvokeEntry(method, mode, {
@@ -909,8 +929,8 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
             <p className="runner-tip">
               {tr(
                 lang,
-                'You can edit the code below before execution. Return a value to display the result.',
-                '可先编辑下面代码再执行。请返回一个值用于展示结果。',
+                'You can edit the code below before execution. Return a value to display the result. Built-ins: ethersParseEther, ethersFormatEther, viemParseEther, viemFormatEther, viemParseUnits, viemFormatUnits.',
+                '可先编辑下面代码再执行。请返回一个值用于展示结果。默认可用：ethersParseEther、ethersFormatEther、viemParseEther、viemFormatEther、viemParseUnits、viemFormatUnits。',
               )}
             </p>
             <textarea
