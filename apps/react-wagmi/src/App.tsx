@@ -733,11 +733,21 @@ function App() {
           )}
         </p>
       </header>
-      <section className="card page-switch">
-        <button onClick={() => setPage('dashboard')} disabled={page === 'dashboard'}>
+      <section className="card page-switch" role="tablist" aria-label="page tabs">
+        <button
+          className={`tab-btn ${page === 'dashboard' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={page === 'dashboard'}
+          onClick={() => setPage('dashboard')}
+        >
           {tr(lang, 'Dashboard', '对比面板')}
         </button>
-        <button onClick={() => setPage('reference')} disabled={page === 'reference'}>
+        <button
+          className={`tab-btn ${page === 'reference' ? 'active' : ''}`}
+          role="tab"
+          aria-selected={page === 'reference'}
+          onClick={() => setPage('reference')}
+        >
           {tr(lang, 'RPC Reference', 'RPC 速查')}
         </button>
       </section>

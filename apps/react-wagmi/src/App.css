@@ -37,6 +37,30 @@
 .page-switch {
   display: flex;
   gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid #dbe3ef;
+  padding-bottom: 10px;
+}
+
+.tab-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #334155;
+  padding: 8px 12px;
+}
+
+.tab-btn:hover {
+  background: #f1f5f9;
+}
+
+.tab-btn.active {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.tab-btn[aria-selected='true'] {
+  font-weight: 600;
 }
 
 .controls h2,
