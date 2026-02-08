@@ -822,6 +822,10 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     )
   }
 
+  const runnerEntry = runnerDialog
+    ? getInvokeEntry(runnerDialog.method, runnerDialog.mode)
+    : undefined
+
   return (
     <section className="card rpc-page">
       <h2>{tr(lang, 'RPC Method Reference (Extended)', 'RPC 方法速查（扩展版）')}</h2>
@@ -935,8 +939,17 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
             />
             <div className="runner-actions">
               <button onClick={() => setRunnerDialog(null)}>{tr(lang, 'Cancel', '取消')}</button>
-              <button onClick={() => void runEditedCode()}>{tr(lang, 'Execute', '执行')}</button>
+              <button onClick={() => void runEditedCode()} disabled={runnerEntry?.loading}>
+                {runnerEntry?.loading
+                  ? tr(lang, 'Executing...', '执行中...')
+                  : tr(lang, 'Execute', '执行')}
+              </button>
             </div>
+            {runnerEntry?.loading && (
+              <pre className="runner-result loading">{tr(lang, 'Executing...', '执行中...')}</pre>
+            )}
+            {runnerEntry?.result && <pre className="runner-result success">{runnerEntry.result}</pre>}
+            {runnerEntry?.error && <pre className="runner-result error">{runnerEntry.error}</pre>}
           </div>
         </div>
       )}

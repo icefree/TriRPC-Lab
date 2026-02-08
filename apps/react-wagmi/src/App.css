@@ -233,6 +233,35 @@
   justify-content: flex-end;
 }
 
+.runner-result {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.runner-result.loading {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.runner-result.success {
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.runner-result.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
 .rpc-category {
   display: grid;
   gap: 8px;
