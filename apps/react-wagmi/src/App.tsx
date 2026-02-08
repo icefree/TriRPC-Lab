@@ -765,6 +765,30 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     }
   }
 
+  const renderModeCell = (method: string, mode: InvokeMode, mappingText: string) => {
+    const entry = getInvokeEntry(method, mode)
+    return (
+      <td>
+        <div className="rpc-cell">
+          <code>{mappingText}</code>
+          <button
+            className="rpc-run-btn"
+            onClick={() => void runRpcMethod(method, mode)}
+            disabled={nonRpcPseudoMethods.has(method) || entry.loading}
+          >
+            {nonRpcPseudoMethods.has(method)
+              ? tr(lang, 'N/A', '不可调用')
+              : entry.loading
+                ? tr(lang, 'Running...', '执行中...')
+                : tr(lang, 'Run', '执行')}
+          </button>
+          {entry.result && <pre className="rpc-output success">{entry.result}</pre>}
+          {entry.error && <pre className="rpc-output error">{entry.error}</pre>}
+        </div>
+      </td>
+    )
+  }
+
   return (
     <section className="card rpc-page">
       <h2>{tr(lang, 'RPC Method Reference (Extended)', 'RPC 方法速查（扩展版）')}</h2>
@@ -808,10 +832,10 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
               <tr>
                 <th>{tr(lang, 'Method', '方法')}</th>
                 <th>{tr(lang, 'Description', '说明')}</th>
+                <th>rpc</th>
                 <th>ethers.js</th>
                 <th>viem</th>
                 <th>wagmi</th>
-                <th>{tr(lang, 'Invoke', '调用')}</th>
               </tr>
             </thead>
             <tbody>
@@ -819,20 +843,8 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                 filteredMethods.map((item) => (
                   <tr key={`${category.titleEn}-${item.method}`}>
                     <td>
-                      <code>{item.method}</code>
-                    </td>
-                    <td>{tr(lang, item.descEn, item.descZh)}</td>
-                    <td>
-                      <code>{methodLibraryMapping(item.method).ethers}</code>
-                    </td>
-                    <td>
-                      <code>{methodLibraryMapping(item.method).viem}</code>
-                    </td>
-                    <td>
-                      <code>{methodLibraryMapping(item.method).wagmi}</code>
-                    </td>
-                    <td>
-                      <div className="rpc-invoke">
+                      <div className="rpc-cell">
+                        <code>{item.method}</code>
                         <input
                           className="rpc-params"
                           value={getParamsValue(item.method)}
@@ -840,30 +852,17 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                           placeholder={tr(lang, 'JSON params array', 'JSON 参数数组')}
                           disabled={nonRpcPseudoMethods.has(item.method)}
                         />
-                        <div className="rpc-run-grid">
-                          {(['rpc', 'ethers', 'viem', 'wagmi'] as InvokeMode[]).map((mode) => {
-                            const entry = getInvokeEntry(item.method, mode)
-                            return (
-                              <div key={`${item.method}-${mode}`} className="rpc-run-item">
-                                <button
-                                  className="rpc-run-btn"
-                                  onClick={() => void runRpcMethod(item.method, mode)}
-                                  disabled={nonRpcPseudoMethods.has(item.method) || entry.loading}
-                                >
-                                  {nonRpcPseudoMethods.has(item.method)
-                                    ? `${mode}: ${tr(lang, 'N/A', '不可调用')}`
-                                    : entry.loading
-                                      ? `${mode}: ${tr(lang, 'Running...', '执行中...')}`
-                                      : `${mode}: ${tr(lang, 'Run', '执行')}`}
-                                </button>
-                                {entry.result && <pre className="rpc-output success">{entry.result}</pre>}
-                                {entry.error && <pre className="rpc-output error">{entry.error}</pre>}
-                              </div>
-                            )
-                          })}
-                        </div>
                       </div>
                     </td>
+                    <td>{tr(lang, item.descEn, item.descZh)}</td>
+                    {renderModeCell(
+                      item.method,
+                      'rpc',
+                      `provider.request({ method: '${item.method}', params })`,
+                    )}
+                    {renderModeCell(item.method, 'ethers', methodLibraryMapping(item.method).ethers)}
+                    {renderModeCell(item.method, 'viem', methodLibraryMapping(item.method).viem)}
+                    {renderModeCell(item.method, 'wagmi', methodLibraryMapping(item.method).wagmi)}
                   </tr>
                 ))
               ) : (
