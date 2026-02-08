@@ -170,7 +170,8 @@
 .rpc-tabs {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  overflow-x: hidden;
   padding-bottom: 4px;
 }
 
