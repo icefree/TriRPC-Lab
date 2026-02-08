@@ -1,0 +1,63 @@
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  border: 1px solid #d0d7de;
+  border-radius: 10px;
+  padding: 16px;
+  background: #fff;
+}
+
+h1,
+h2 {
+  margin: 0 0 12px;
+}
+
+p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+input {
+  border: 1px solid #c6cbd1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.actions,
+.form {
+  display: grid;
+  gap: 10px;
+}
+
+button {
+  width: fit-content;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #b42318;
+}
