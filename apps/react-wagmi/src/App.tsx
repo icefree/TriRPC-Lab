@@ -261,87 +261,6 @@ function ActionBlock({
   )
 }
 
-function QuickLookupTable({ lang }: { lang: Lang }) {
-  const rows = [
-    {
-      scenarioEn: 'Connect wallet / request account',
-      scenarioZh: '连接钱包 / 请求账户授权',
-      ethers: "provider.send('eth_requestAccounts', [])",
-      viem: 'walletClient.requestAddresses()',
-      wagmi: 'useConnect().connect({ connector })',
-    },
-    {
-      scenarioEn: 'Chain & block',
-      scenarioZh: '链 ID 与区块',
-      ethers: 'provider.getNetwork(); provider.getBlockNumber()',
-      viem: 'publicClient.getChainId(); publicClient.getBlockNumber()',
-      wagmi: 'useChainId(); useBlockNumber({ watch: true })',
-    },
-    {
-      scenarioEn: 'Balance query',
-      scenarioZh: '余额查询',
-      ethers: 'provider.getBalance(address)',
-      viem: 'publicClient.getBalance({ address })',
-      wagmi: 'useBalance({ address })',
-    },
-    {
-      scenarioEn: 'Send native transfer',
-      scenarioZh: '发起原生转账',
-      ethers: 'signer.sendTransaction({ to, value })',
-      viem: 'walletClient.sendTransaction({ account, to, value })',
-      wagmi: 'useSendTransaction().sendTransaction({ to, value })',
-    },
-    {
-      scenarioEn: 'Query transaction / receipt',
-      scenarioZh: '查询交易 / 回执',
-      ethers: 'getTransaction(hash); getTransactionReceipt(hash)',
-      viem: "getTransaction({ hash }); getTransactionReceipt({ hash })",
-      wagmi: 'useTransaction({ hash }); useTransactionReceipt({ hash })',
-    },
-    {
-      scenarioEn: 'Contract read/write',
-      scenarioZh: '合约读写',
-      ethers: 'contract.getCount(); contract.increment()',
-      viem: "readContract(...); writeContract(..., 'increment')",
-      wagmi: 'useReadContract(...); useWriteContract(...)',
-    },
-  ]
-
-  return (
-    <section className="card quick-lookup">
-      <h2>{tr(lang, 'Quick Lookup Table', '快速查询表')}</h2>
-      <div className="quick-table-wrap">
-        <table className="quick-table">
-          <thead>
-            <tr>
-              <th>{tr(lang, 'Scenario', '场景')}</th>
-              <th>ethers.js</th>
-              <th>viem</th>
-              <th>wagmi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.scenarioEn}>
-                <td>{tr(lang, row.scenarioEn, row.scenarioZh)}</td>
-                <td>
-                  <code>{row.ethers}</code>
-                </td>
-                <td>
-                  <code>{row.viem}</code>
-                </td>
-                <td>
-                  <code>{row.wagmi}</code>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
-
 function methodLibraryMapping(method: string): { ethers: string; viem: string; wagmi: string } {
   const map: Record<string, { ethers: string; viem: string; wagmi: string }> = {
     eth_chainId: {
@@ -639,6 +558,9 @@ function methodLibraryMapping(method: string): { ethers: string; viem: string; w
 }
 
 function RpcReferencePage({ lang }: { lang: Lang }) {
+  const [activeCategory, setActiveCategory] = useState(0)
+  const category = RPC_REFERENCE[activeCategory]
+
   return (
     <section className="card rpc-page">
       <h2>{tr(lang, 'RPC Method Reference (Extended)', 'RPC 方法速查（扩展版）')}</h2>
@@ -649,45 +571,57 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
           '这是实用的“尽量全”集合，具体可用性取决于钱包与节点客户端实现。',
         )}
       </p>
-      {RPC_REFERENCE.map((category) => (
-        <div className="rpc-category" key={category.titleEn}>
-          <h3>{tr(lang, category.titleEn, category.titleZh)}</h3>
-          <div className="quick-table-wrap">
-            <table className="quick-table rpc-table">
-              <thead>
-                <tr>
-                  <th>{tr(lang, 'Method', '方法')}</th>
-                  <th>{tr(lang, 'Description', '说明')}</th>
-                  <th>{tr(lang, 'Notes', '备注')}</th>
-                  <th>ethers.js</th>
-                  <th>viem</th>
-                  <th>wagmi</th>
+      <div className="rpc-tabs" role="tablist" aria-label="rpc categories">
+        {RPC_REFERENCE.map((item, index) => (
+          <button
+            key={item.titleEn}
+            className={`rpc-tab-btn ${activeCategory === index ? 'active' : ''}`}
+            role="tab"
+            aria-selected={activeCategory === index}
+            onClick={() => setActiveCategory(index)}
+          >
+            {tr(lang, item.titleEn, item.titleZh)}
+          </button>
+        ))}
+      </div>
+
+      <div className="rpc-category">
+        <h3>{tr(lang, category.titleEn, category.titleZh)}</h3>
+        <div className="quick-table-wrap">
+          <table className="quick-table rpc-table">
+            <thead>
+              <tr>
+                <th>{tr(lang, 'Method', '方法')}</th>
+                <th>{tr(lang, 'Description', '说明')}</th>
+                <th>{tr(lang, 'Notes', '备注')}</th>
+                <th>ethers.js</th>
+                <th>viem</th>
+                <th>wagmi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {category.methods.map((item) => (
+                <tr key={`${category.titleEn}-${item.method}`}>
+                  <td>
+                    <code>{item.method}</code>
+                  </td>
+                  <td>{tr(lang, item.descEn, item.descZh)}</td>
+                  <td>{item.noteEn ? tr(lang, item.noteEn, item.noteZh ?? item.noteEn) : '-'}</td>
+                  <td>
+                    <code>{methodLibraryMapping(item.method).ethers}</code>
+                  </td>
+                  <td>
+                    <code>{methodLibraryMapping(item.method).viem}</code>
+                  </td>
+                  <td>
+                    <code>{methodLibraryMapping(item.method).wagmi}</code>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {category.methods.map((item) => (
-                  <tr key={`${category.titleEn}-${item.method}`}>
-                    <td>
-                      <code>{item.method}</code>
-                    </td>
-                    <td>{tr(lang, item.descEn, item.descZh)}</td>
-                    <td>{item.noteEn ? tr(lang, item.noteEn, item.noteZh ?? item.noteEn) : '-'}</td>
-                    <td>
-                      <code>{methodLibraryMapping(item.method).ethers}</code>
-                    </td>
-                    <td>
-                      <code>{methodLibraryMapping(item.method).viem}</code>
-                    </td>
-                    <td>
-                      <code>{methodLibraryMapping(item.method).wagmi}</code>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ))}
+      </div>
     </section>
   )
 }
@@ -754,8 +688,6 @@ function App() {
 
       {page === 'dashboard' ? (
         <>
-          <QuickLookupTable lang={lang} />
-
           <section className="card controls">
             <h2>{tr(lang, 'Shared Inputs', '共享输入')}</h2>
             <div className="controls-grid">
