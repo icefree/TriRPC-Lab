@@ -43,6 +43,7 @@
   display: grid;
   gap: 10px;
   align-content: start;
+  min-width: 0;
 }
 
 label {
@@ -76,6 +77,7 @@ button:disabled {
 .row {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 p {
@@ -85,6 +87,47 @@ p {
 
 .error {
   color: #b42318;
+}
+
+.code-fold {
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid #d8dee9;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.code-fold summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #334155;
+  user-select: none;
+  overflow-wrap: anywhere;
+}
+
+.code-fold pre {
+  margin: 8px 0 0;
+  max-width: 100%;
+  overflow: auto;
+  background: #0b1220;
+  color: #dbe7ff;
+  border-radius: 6px;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.code-fold code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.code-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 @media (max-width: 1100px) {
