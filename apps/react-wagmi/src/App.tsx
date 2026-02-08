@@ -586,6 +586,13 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
   const [query, setQuery] = useState('')
   const [paramsMap, setParamsMap] = useState<Record<string, string>>({})
   const [invokeMap, setInvokeMap] = useState<Record<string, InvokeState>>({})
+  const [copiedOutputKey, setCopiedOutputKey] = useState('')
+  const [copyError, setCopyError] = useState('')
+  const [latestResultText, setLatestResultText] = useState('')
+  const [toolInput, setToolInput] = useState('')
+  const [toolDecimals, setToolDecimals] = useState('18')
+  const [toolResult, setToolResult] = useState('')
+  const [toolError, setToolError] = useState('')
   const wagmiPublicClient = usePublicClient()
   const { data: wagmiWalletClient } = useWalletClient()
   const category = RPC_REFERENCE[activeCategory]
@@ -658,6 +665,110 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
           ? 'runViemMethod'
           : 'runWagmiMethod'
     return `// ${mapping}\nconst method = '${method}'\nconst params = ${safeParams}\nreturn await ${modeRunner}(method, params)`
+  }
+
+  const formatRunnerResult = (result: unknown): string => {
+    if (typeof result === 'string') return result
+    if (typeof result === 'bigint') return result.toString()
+    try {
+      return JSON.stringify(
+        result,
+        (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
+        2,
+      )
+    } catch {
+      return String(result)
+    }
+  }
+
+  const copyText = async (text: string, key: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.setAttribute('readonly', 'true')
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        const copied = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        if (!copied) throw new Error('copy failed')
+      }
+
+      setCopyError('')
+      setCopiedOutputKey(key)
+      window.setTimeout(() => {
+        setCopiedOutputKey((prev) => (prev === key ? '' : prev))
+      }, 1200)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setCopyError(message)
+    }
+  }
+
+  const parseToolBigInt = (value: string): bigint => {
+    const normalized = value.trim()
+    if (!normalized) {
+      throw new Error(tr(lang, 'Please input a value first.', '请先输入一个值。'))
+    }
+    return BigInt(normalized)
+  }
+
+  const parseToolDecimals = (): number => {
+    const decimals = Number(toolDecimals)
+    if (!Number.isInteger(decimals) || decimals < 0) {
+      throw new Error(tr(lang, 'Decimals must be a non-negative integer.', 'Decimals 必须是非负整数。'))
+    }
+    return decimals
+  }
+
+  const fillToolInputFromLatestResult = () => {
+    const normalized = latestResultText.trim()
+    if (!normalized) return
+    if (normalized.startsWith('"') && normalized.endsWith('"')) {
+      try {
+        const parsed = JSON.parse(normalized)
+        if (typeof parsed === 'string') {
+          setToolInput(parsed)
+          return
+        }
+      } catch {
+        // ignore parse failure and fallback to raw text
+      }
+    }
+    setToolInput(normalized)
+  }
+
+  const runQuickTool = (
+    action: 'hexToBinary' | 'parseEther' | 'formatEther' | 'parseUnits' | 'formatUnits',
+  ) => {
+    try {
+      setToolError('')
+      const input = toolInput.trim()
+      if (!input) throw new Error(tr(lang, 'Please input a value first.', '请先输入一个值。'))
+
+      let output = ''
+      if (action === 'hexToBinary') {
+        const normalizedHex = input.startsWith('0x') || input.startsWith('0X') ? input : `0x${input}`
+        output = BigInt(normalizedHex).toString(2)
+      } else if (action === 'parseEther') {
+        output = parseEther(input).toString()
+      } else if (action === 'formatEther') {
+        output = formatEther(parseToolBigInt(input))
+      } else if (action === 'parseUnits') {
+        output = parseUnits(input, parseToolDecimals()).toString()
+      } else {
+        output = formatUnits(parseToolBigInt(input), parseToolDecimals())
+      }
+
+      setToolResult(output)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setToolError(message)
+    }
   }
 
   const normalizeRunnerParams = (params: unknown): unknown[] => {
@@ -836,6 +947,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         walletClient?: any
         walletError: string
         publicError: string
+        preferWalletChainId?: boolean
       },
     ): Promise<unknown> => {
       const paramsArray = normalizeRunnerParams(params)
@@ -850,6 +962,16 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
 
       switch (method) {
         case 'eth_chainId': {
+          if (clients.preferWalletChainId && typeof clients.walletClient?.request === 'function') {
+            const walletChainId = await clients.walletClient.request({
+              method: 'eth_chainId',
+              params: [],
+            })
+            if (typeof walletChainId === 'string') return walletChainId
+            if (typeof walletChainId === 'number' || typeof walletChainId === 'bigint') {
+              return `0x${walletChainId.toString(16)}`
+            }
+          }
           if (!clients.publicClient?.getChainId) return await publicRequestFallback()
           const chainId = await clients.publicClient.getChainId()
           return `0x${chainId.toString(16)}`
@@ -1220,6 +1342,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         walletClient: wagmiWalletClient,
         walletError: 'wagmi wallet client not ready',
         publicError: 'wagmi public client not ready',
+        preferWalletChainId: true,
       })
     }
 
@@ -1294,23 +1417,27 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       }
       const code = buildRunnerCode(method, mode, getParamsValue(method))
       const result = await executeRunnerCode(provider, mode, code)
+      const resultText = formatRunnerResult(result)
 
       setInvokeEntry(method, mode, {
         loading: false,
-        result: JSON.stringify(result, null, 2),
+        result: resultText,
         error: undefined,
       })
+      setLatestResultText(resultText)
     } catch (error) {
       if (!requiresAuthorization(method) && method !== 'eth_requestAccounts' && isUnauthorizedError(error)) {
         try {
           await ensureAuthorized(provider, mode)
           const code = buildRunnerCode(method, mode, getParamsValue(method))
           const retryResult = await executeRunnerCode(provider, mode, code)
+          const retryResultText = formatRunnerResult(retryResult)
           setInvokeEntry(method, mode, {
             loading: false,
-            result: JSON.stringify(retryResult, null, 2),
+            result: retryResultText,
             error: undefined,
           })
+          setLatestResultText(retryResultText)
           return
         } catch (retryError) {
           const retryMessage = retryError instanceof Error ? retryError.message : String(retryError)
@@ -1326,6 +1453,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
 
   const renderModeCell = (method: string, mode: InvokeMode, mappingText: string) => {
     const entry = getInvokeEntry(method, mode)
+    const invokeKey = makeInvokeKey(method, mode)
+    const resultCopied = copiedOutputKey === invokeKey
+    const errorCopied = copiedOutputKey === `${invokeKey}::error`
     return (
       <td>
         <div className="rpc-cell">
@@ -1341,8 +1471,28 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                 ? tr(lang, 'Running...', '执行中...')
                 : tr(lang, 'Run', '执行')}
           </button>
-          {entry.result && <pre className="rpc-output success">{entry.result}</pre>}
-          {entry.error && <pre className="rpc-output error">{entry.error}</pre>}
+          {entry.result && (
+            <div className="rpc-output-wrap">
+              <button
+                className="rpc-copy-btn"
+                onClick={() => void copyText(entry.result ?? '', invokeKey)}
+              >
+                {resultCopied ? tr(lang, 'Copied', '已复制') : tr(lang, 'Copy', '复制')}
+              </button>
+              <pre className="rpc-output success">{entry.result}</pre>
+            </div>
+          )}
+          {entry.error && (
+            <div className="rpc-output-wrap">
+              <button
+                className="rpc-copy-btn"
+                onClick={() => void copyText(entry.error ?? '', `${invokeKey}::error`)}
+              >
+                {errorCopied ? tr(lang, 'Copied', '已复制') : tr(lang, 'Copy', '复制')}
+              </button>
+              <pre className="rpc-output error">{entry.error}</pre>
+            </div>
+          )}
         </div>
       </td>
     )
@@ -1439,6 +1589,58 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
           </table>
         </div>
       </div>
+
+      <aside className="rpc-float-tools" aria-label="quick-tools">
+        <h3>{tr(lang, 'Quick Utilities', '快捷工具')}</h3>
+        <p className="rpc-tool-note">
+          {tr(
+            lang,
+            'Convert values quickly. You can paste output and run helper transforms.',
+            '快速转换执行结果，可粘贴结果并执行辅助转换。',
+          )}
+        </p>
+        <textarea
+          className="rpc-tool-input"
+          placeholder={tr(lang, 'Input (hex / wei / decimal)', '输入值（hex / wei / 十进制）')}
+          value={toolInput}
+          onChange={(event) => setToolInput(event.target.value)}
+        />
+        <div className="rpc-tool-inline">
+          <label>
+            {tr(lang, 'Decimals', 'Decimals')}
+            <input
+              className="rpc-tool-decimals"
+              value={toolDecimals}
+              onChange={(event) => setToolDecimals(event.target.value)}
+            />
+          </label>
+          <button onClick={fillToolInputFromLatestResult} disabled={!latestResultText}>
+            {tr(lang, 'Use Last Result', '使用最近结果')}
+          </button>
+        </div>
+        <div className="rpc-tool-actions">
+          <button onClick={() => runQuickTool('hexToBinary')}>{tr(lang, 'Hex -> Binary', '16进制 -> 2进制')}</button>
+          <button onClick={() => runQuickTool('parseEther')}>parseEther</button>
+          <button onClick={() => runQuickTool('formatEther')}>formatEther</button>
+          <button onClick={() => runQuickTool('parseUnits')}>parseUnits</button>
+          <button onClick={() => runQuickTool('formatUnits')}>formatUnits</button>
+        </div>
+        {toolResult && (
+          <div className="rpc-output-wrap">
+            <button
+              className="rpc-copy-btn"
+              onClick={() => void copyText(toolResult, 'tool::result')}
+            >
+              {copiedOutputKey === 'tool::result'
+                ? tr(lang, 'Copied', '已复制')
+                : tr(lang, 'Copy', '复制')}
+            </button>
+            <pre className="rpc-output success">{toolResult}</pre>
+          </div>
+        )}
+        {toolError && <pre className="rpc-output error">{toolError}</pre>}
+        {copyError && <pre className="rpc-output error">{copyError}</pre>}
+      </aside>
 
     </section>
   )

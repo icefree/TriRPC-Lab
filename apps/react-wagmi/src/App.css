@@ -187,79 +187,85 @@
   color: #991b1b;
 }
 
-.runner-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+.rpc-output-wrap {
   display: grid;
-  place-items: center;
-  padding: 16px;
-  z-index: 1000;
+  gap: 6px;
 }
 
-.runner-modal {
-  width: min(900px, 100%);
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 12px;
-  padding: 14px;
-  display: grid;
-  gap: 10px;
-}
-
-.runner-modal h3 {
-  margin: 0;
-}
-
-.runner-tip {
-  margin: 0;
-  color: #475569;
-  font-size: 13px;
-}
-
-.runner-modal textarea {
-  width: 100%;
-  min-height: 240px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 13px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.runner-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.runner-result {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  border-radius: 8px;
-  padding: 8px 10px;
+.rpc-copy-btn {
+  width: fit-content;
+  padding: 4px 8px;
   font-size: 12px;
-  max-height: 200px;
-  overflow: auto;
-}
-
-.runner-result.loading {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #334155;
-}
-
-.runner-result.success {
+  border: 1px solid #10b981;
   background: #ecfdf5;
-  border: 1px solid #86efac;
   color: #166534;
 }
 
-.runner-result.error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+.rpc-float-tools {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: 72vh;
+  overflow: auto;
+  z-index: 20;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.rpc-float-tools h3 {
+  margin: 0;
+}
+
+.rpc-tool-note {
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+}
+
+.rpc-tool-input {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.rpc-tool-inline {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.rpc-tool-inline label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.rpc-tool-decimals {
+  width: 88px;
+}
+
+.rpc-tool-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rpc-tool-actions button {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
 }
 
 .rpc-category {
@@ -420,5 +426,12 @@ p {
 
   .controls-grid {
     grid-template-columns: 1fr;
+  }
+
+  .rpc-float-tools {
+    position: static;
+    width: 100%;
+    max-height: none;
+    box-shadow: none;
   }
 }
