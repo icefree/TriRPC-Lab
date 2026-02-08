@@ -8,9 +8,9 @@ import {
   formatEther,
   isAddress,
   isHash,
-  parseUnits as parseUnitsViem,
+  parseUnits,
   parseEther,
-  formatUnits as formatUnitsViem,
+  formatUnits,
 } from 'viem'
 import {
   useAccount,
@@ -783,8 +783,8 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
         wagmiWalletClient,
         parseEther,
         formatEther,
-        parseUnitsViem,
-        formatUnitsViem,
+        parseUnits,
+        formatUnits,
       )
 
       setInvokeEntry(method, mode, {
