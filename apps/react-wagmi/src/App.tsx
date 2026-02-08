@@ -28,6 +28,7 @@ import {
   usePublicClient,
   useWalletClient,
 } from 'wagmi'
+import { wagmiConfig } from './wagmi'
 import './App.css'
 
 type Hex = `0x${string}`
@@ -247,13 +248,14 @@ function tr(lang: Lang, en: string, zh: string) {
 }
 
 declare global {
-  interface Window {
-    ethereum?: Eip1193Provider
-  }
+  interface Window {}
 }
 
 function getInjectedProvider() {
-  return window.ethereum
+  const ethereum = (window as { ethereum?: unknown }).ethereum
+  if (!ethereum || typeof ethereum !== 'object') return undefined
+  if (typeof (ethereum as { request?: unknown }).request !== 'function') return undefined
+  return ethereum as Eip1193Provider
 }
 
 function CodeFold({ lang, title, code }: { lang: Lang; title: string; code: string }) {
@@ -1664,6 +1666,13 @@ function App() {
     () => (isAddress(contractInput) ? (contractInput as Hex) : undefined),
     [contractInput],
   )
+  const chainId = useChainId()
+  const { chain: walletChain, isConnected: isWalletConnected } = useAccount()
+  const currentChainName = useMemo(() => {
+    if (walletChain?.name) return walletChain.name
+    const configChain = wagmiConfig.chains.find((item) => item.id === chainId)
+    return configChain?.name
+  }, [walletChain?.name, chainId])
 
   return (
     <main className="page">
@@ -1695,6 +1704,14 @@ function App() {
             'Use the same inputs to compare ethers.js / viem / wagmi behavior side by side.',
             '使用同一组输入，横向对比 ethers.js / viem / wagmi 的行为。',
           )}
+        </p>
+        <p className="chain-status">
+          {tr(lang, 'Current Chain', '当前链')}:{' '}
+          {isWalletConnected
+            ? currentChainName
+              ? `${currentChainName} (${chainId})`
+              : `${tr(lang, 'Unknown', '未知')} (${chainId})`
+            : tr(lang, 'Wallet not connected', '钱包未连接')}
         </p>
       </header>
       <section className="card page-switch" role="tablist" aria-label="page tabs">
