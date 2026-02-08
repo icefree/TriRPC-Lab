@@ -576,17 +576,13 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
   const { data: wagmiWalletClient } = useWalletClient()
   const category = RPC_REFERENCE[activeCategory]
   const normalizedQuery = query.trim().toLowerCase()
-  const filteredMethods = category.methods.filter((item) => {
+  const searchSource = normalizedQuery
+    ? RPC_REFERENCE.flatMap((c) => c.methods.map((m) => ({ ...m, categoryEn: c.titleEn, categoryZh: c.titleZh })))
+    : category.methods.map((m) => ({ ...m, categoryEn: category.titleEn, categoryZh: category.titleZh }))
+  const filteredMethods = searchSource.filter((item) => {
     if (!normalizedQuery) return true
     const mapping = methodLibraryMapping(item.method)
-    const target = [
-      item.method,
-      item.descEn,
-      item.descZh,
-      mapping.ethers,
-      mapping.viem,
-      mapping.wagmi,
-    ]
+    const target = [item.method, item.descEn, item.descZh, mapping.ethers, mapping.viem, mapping.wagmi, item.categoryEn, item.categoryZh]
       .join(' ')
       .toLowerCase()
     return target.includes(normalizedQuery)
@@ -825,11 +821,16 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       </div>
 
       <div className="rpc-category">
-        <h3>{tr(lang, category.titleEn, category.titleZh)}</h3>
+        <h3>
+          {normalizedQuery
+            ? tr(lang, 'Search Results Across All Categories', '跨全部分类的搜索结果')
+            : tr(lang, category.titleEn, category.titleZh)}
+        </h3>
         <div className="quick-table-wrap">
           <table className="quick-table rpc-table">
             <thead>
               <tr>
+                {normalizedQuery && <th>{tr(lang, 'Category', '分类')}</th>}
                 <th>{tr(lang, 'Method', '方法')}</th>
                 <th>{tr(lang, 'Description', '说明')}</th>
                 <th>rpc</th>
@@ -841,7 +842,8 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
             <tbody>
               {filteredMethods.length > 0 ? (
                 filteredMethods.map((item) => (
-                  <tr key={`${category.titleEn}-${item.method}`}>
+                  <tr key={`${item.categoryEn}-${item.method}`}>
+                    {normalizedQuery && <td>{tr(lang, item.categoryEn, item.categoryZh)}</td>}
                     <td>
                       <div className="rpc-cell">
                         <code>{item.method}</code>
@@ -867,7 +869,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6}>{tr(lang, 'No matching methods.', '没有匹配的方法。')}</td>
+                  <td colSpan={normalizedQuery ? 7 : 6}>{tr(lang, 'No matching methods.', '没有匹配的方法。')}</td>
                 </tr>
               )}
             </tbody>
