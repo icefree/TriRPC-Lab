@@ -743,7 +743,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
   }
 
   const runQuickTool = (
-    action: 'hexToBinary' | 'parseEther' | 'formatEther' | 'parseUnits' | 'formatUnits',
+    action: 'hexToInteger' | 'parseEther' | 'formatEther' | 'parseUnits' | 'formatUnits',
   ) => {
     try {
       setToolError('')
@@ -751,9 +751,9 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
       if (!input) throw new Error(tr(lang, 'Please input a value first.', '请先输入一个值。'))
 
       let output = ''
-      if (action === 'hexToBinary') {
+      if (action === 'hexToInteger') {
         const normalizedHex = input.startsWith('0x') || input.startsWith('0X') ? input : `0x${input}`
-        output = BigInt(normalizedHex).toString(2)
+        output = BigInt(normalizedHex).toString(10)
       } else if (action === 'parseEther') {
         output = parseEther(input).toString()
       } else if (action === 'formatEther') {
@@ -1619,7 +1619,7 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
           </button>
         </div>
         <div className="rpc-tool-actions">
-          <button onClick={() => runQuickTool('hexToBinary')}>{tr(lang, 'Hex -> Binary', '16进制 -> 2进制')}</button>
+          <button onClick={() => runQuickTool('hexToInteger')}>{tr(lang, 'Hex -> Integer', '16进制 -> 整数')}</button>
           <button onClick={() => runQuickTool('parseEther')}>parseEther</button>
           <button onClick={() => runQuickTool('formatEther')}>formatEther</button>
           <button onClick={() => runQuickTool('parseUnits')}>parseUnits</button>
