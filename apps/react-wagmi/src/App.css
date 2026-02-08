@@ -69,14 +69,14 @@
 }
 
 .quick-table-wrap {
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .quick-table {
   width: 100%;
-  min-width: 860px;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
 
 .quick-table th,
@@ -85,6 +85,8 @@
   padding: 8px 10px;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .quick-table th {
@@ -98,6 +100,7 @@
   background: #f0fdf4;
   padding: 2px 4px;
   border-radius: 4px;
+  white-space: normal;
   word-break: break-word;
 }
 
@@ -149,7 +152,7 @@
 }
 
 .rpc-table {
-  min-width: 1480px;
+  width: 100%;
 }
 
 .controls-grid {
