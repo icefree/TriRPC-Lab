@@ -23,6 +23,8 @@ import {
   useTransactionReceipt,
   useWaitForTransactionReceipt,
   useWriteContract,
+  usePublicClient,
+  useWalletClient,
 } from 'wagmi'
 import './App.css'
 
@@ -59,11 +61,12 @@ type RpcCategory = {
 }
 
 type InvokeState = {
-  params: string
   loading: boolean
   result?: string
   error?: string
 }
+
+type InvokeMode = 'rpc' | 'ethers' | 'viem' | 'wagmi'
 
 const CODES: Record<'ethers' | 'viem' | 'wagmi', ActionCode> = {
   ethers: {
@@ -567,7 +570,10 @@ function methodLibraryMapping(method: string): { ethers: string; viem: string; w
 function RpcReferencePage({ lang }: { lang: Lang }) {
   const [activeCategory, setActiveCategory] = useState(0)
   const [query, setQuery] = useState('')
+  const [paramsMap, setParamsMap] = useState<Record<string, string>>({})
   const [invokeMap, setInvokeMap] = useState<Record<string, InvokeState>>({})
+  const wagmiPublicClient = usePublicClient()
+  const { data: wagmiWalletClient } = useWalletClient()
   const category = RPC_REFERENCE[activeCategory]
   const normalizedQuery = query.trim().toLowerCase()
   const filteredMethods = category.methods.filter((item) => {
@@ -619,31 +625,90 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     return samples[method] ?? '[]'
   }
 
-  const getInvokeEntry = (method: string): InvokeState => {
-    return invokeMap[method] ?? { params: defaultParams(method), loading: false }
+  const makeInvokeKey = (method: string, mode: InvokeMode) => `${method}::${mode}`
+
+  const getParamsValue = (method: string) => {
+    return paramsMap[method] ?? defaultParams(method)
   }
 
-  const setInvokeEntry = (method: string, patch: Partial<InvokeState>) => {
+  const setParamsValue = (method: string, value: string) => {
+    setParamsMap((prev) => ({ ...prev, [method]: value }))
+  }
+
+  const getInvokeEntry = (method: string, mode: InvokeMode): InvokeState => {
+    return invokeMap[makeInvokeKey(method, mode)] ?? { loading: false }
+  }
+
+  const setInvokeEntry = (method: string, mode: InvokeMode, patch: Partial<InvokeState>) => {
     setInvokeMap((prev) => {
-      const current = prev[method] ?? { params: defaultParams(method), loading: false }
-      return { ...prev, [method]: { ...current, ...patch } }
+      const key = makeInvokeKey(method, mode)
+      const current = prev[key] ?? { loading: false }
+      return { ...prev, [key]: { ...current, ...patch } }
     })
   }
 
-  const runRpcMethod = async (method: string) => {
+  const isWalletPreferredMethod = (method: string) => {
+    return (
+      method.startsWith('wallet_') ||
+      method === 'eth_requestAccounts' ||
+      method === 'eth_accounts' ||
+      method === 'personal_sign' ||
+      method.startsWith('eth_sign') ||
+      method === 'eth_sendTransaction' ||
+      method === 'eth_signTransaction'
+    )
+  }
+
+  const requiresAuthorization = (method: string) => {
+    return (
+      method.startsWith('wallet_') ||
+      method === 'eth_sendTransaction' ||
+      method === 'eth_signTransaction' ||
+      method === 'eth_sign' ||
+      method === 'eth_signTypedData' ||
+      method === 'eth_signTypedData_v3' ||
+      method === 'eth_signTypedData_v4' ||
+      method === 'personal_sign'
+    )
+  }
+
+  const ensureAuthorized = async (provider: Eip1193Provider, mode: InvokeMode) => {
+    if (mode === 'rpc') {
+      await provider.request({ method: 'eth_requestAccounts', params: [] })
+      return
+    }
+    if (mode === 'ethers') {
+      const ethersProvider = new BrowserProvider(provider)
+      await ethersProvider.send('eth_requestAccounts', [])
+      return
+    }
+    if (mode === 'viem') {
+      const walletClient = createWalletClient({ transport: custom(provider), chain: undefined })
+      await walletClient.requestAddresses()
+      return
+    }
+    if (!wagmiWalletClient) {
+      throw new Error(tr(lang, 'Wallet client not ready in wagmi.', 'wagmi 钱包客户端尚未就绪。'))
+    }
+    await (wagmiWalletClient as any).requestAddresses()
+  }
+
+  const runRpcMethod = async (method: string, mode: InvokeMode) => {
     if (nonRpcPseudoMethods.has(method)) return
     const provider = getInjectedProvider()
     if (!provider) {
-      setInvokeEntry(method, { error: tr(lang, 'No injected wallet provider found.', '未检测到注入钱包 Provider。') })
+      setInvokeEntry(method, mode, {
+        error: tr(lang, 'No injected wallet provider found.', '未检测到注入钱包 Provider。'),
+      })
       return
     }
 
-    const entry = getInvokeEntry(method)
+    const paramsSource = getParamsValue(method)
     let parsedParams: unknown = []
     try {
-      parsedParams = entry.params.trim() ? JSON.parse(entry.params) : []
+      parsedParams = paramsSource.trim() ? JSON.parse(paramsSource) : []
     } catch {
-      setInvokeEntry(method, {
+      setInvokeEntry(method, mode, {
         loading: false,
         result: undefined,
         error: tr(lang, 'Invalid JSON params.', '参数 JSON 格式无效。'),
@@ -652,18 +717,51 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
     }
 
     const params = Array.isArray(parsedParams) ? parsedParams : [parsedParams]
-    setInvokeEntry(method, { loading: true, error: undefined, result: undefined })
+    setInvokeEntry(method, mode, { loading: true, error: undefined, result: undefined })
 
     try {
-      const result = await provider.request({ method, params })
-      setInvokeEntry(method, {
+      if (requiresAuthorization(method) && method !== 'eth_requestAccounts') {
+        await ensureAuthorized(provider, mode)
+      }
+
+      let result: unknown
+      if (mode === 'rpc') {
+        result = await provider.request({ method, params })
+      } else if (mode === 'ethers') {
+        const ethersProvider = new BrowserProvider(provider)
+        result = await ethersProvider.send(method, params)
+      } else if (mode === 'viem') {
+        const useWallet = isWalletPreferredMethod(method)
+        if (useWallet) {
+          const walletClient = createWalletClient({ transport: custom(provider), chain: undefined })
+          result = await (walletClient as any).request({ method, params })
+        } else {
+          const publicClient = createPublicClient({ transport: custom(provider) })
+          result = await (publicClient as any).request({ method, params })
+        }
+      } else {
+        const useWallet = isWalletPreferredMethod(method)
+        if (useWallet) {
+          if (!wagmiWalletClient) {
+            throw new Error(tr(lang, 'Wallet client not ready in wagmi.', 'wagmi 钱包客户端尚未就绪。'))
+          }
+          result = await (wagmiWalletClient as any).request({ method, params })
+        } else {
+          if (!wagmiPublicClient) {
+            throw new Error(tr(lang, 'Public client not ready in wagmi.', 'wagmi 公共客户端尚未就绪。'))
+          }
+          result = await (wagmiPublicClient as any).request({ method, params })
+        }
+      }
+
+      setInvokeEntry(method, mode, {
         loading: false,
         result: JSON.stringify(result, null, 2),
         error: undefined,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setInvokeEntry(method, { loading: false, result: undefined, error: message })
+      setInvokeEntry(method, mode, { loading: false, result: undefined, error: message })
     }
   }
 
@@ -737,28 +835,33 @@ function RpcReferencePage({ lang }: { lang: Lang }) {
                       <div className="rpc-invoke">
                         <input
                           className="rpc-params"
-                          value={getInvokeEntry(item.method).params}
-                          onChange={(event) => setInvokeEntry(item.method, { params: event.target.value })}
+                          value={getParamsValue(item.method)}
+                          onChange={(event) => setParamsValue(item.method, event.target.value)}
                           placeholder={tr(lang, 'JSON params array', 'JSON 参数数组')}
                           disabled={nonRpcPseudoMethods.has(item.method)}
                         />
-                        <button
-                          className="rpc-run-btn"
-                          onClick={() => void runRpcMethod(item.method)}
-                          disabled={nonRpcPseudoMethods.has(item.method) || getInvokeEntry(item.method).loading}
-                        >
-                          {nonRpcPseudoMethods.has(item.method)
-                            ? tr(lang, 'N/A', '不可调用')
-                            : getInvokeEntry(item.method).loading
-                              ? tr(lang, 'Running...', '执行中...')
-                              : tr(lang, 'Run', '执行')}
-                        </button>
-                        {getInvokeEntry(item.method).result && (
-                          <pre className="rpc-output success">{getInvokeEntry(item.method).result}</pre>
-                        )}
-                        {getInvokeEntry(item.method).error && (
-                          <pre className="rpc-output error">{getInvokeEntry(item.method).error}</pre>
-                        )}
+                        <div className="rpc-run-grid">
+                          {(['rpc', 'ethers', 'viem', 'wagmi'] as InvokeMode[]).map((mode) => {
+                            const entry = getInvokeEntry(item.method, mode)
+                            return (
+                              <div key={`${item.method}-${mode}`} className="rpc-run-item">
+                                <button
+                                  className="rpc-run-btn"
+                                  onClick={() => void runRpcMethod(item.method, mode)}
+                                  disabled={nonRpcPseudoMethods.has(item.method) || entry.loading}
+                                >
+                                  {nonRpcPseudoMethods.has(item.method)
+                                    ? `${mode}: ${tr(lang, 'N/A', '不可调用')}`
+                                    : entry.loading
+                                      ? `${mode}: ${tr(lang, 'Running...', '执行中...')}`
+                                      : `${mode}: ${tr(lang, 'Run', '执行')}`}
+                                </button>
+                                {entry.result && <pre className="rpc-output success">{entry.result}</pre>}
+                                {entry.error && <pre className="rpc-output error">{entry.error}</pre>}
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     </td>
                   </tr>
