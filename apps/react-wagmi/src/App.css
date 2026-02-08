@@ -28,6 +28,18 @@
   font-weight: 600;
 }
 
+.chain-status-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chain-connect-btn {
+  margin-top: 0;
+}
+
 .card {
   border: 1px solid #cfd7e3;
   border-radius: 12px;

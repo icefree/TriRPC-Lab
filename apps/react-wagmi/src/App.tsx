@@ -1723,11 +1723,16 @@ function App() {
   )
   const chainId = useChainId()
   const { chain: walletChain, isConnected: isWalletConnected } = useAccount()
+  const { connect, connectors, isPending: isHeaderConnectPending } = useConnect()
   const currentChainName = useMemo(() => {
     if (walletChain?.name) return walletChain.name
     const configChain = wagmiConfig.chains.find((item) => item.id === chainId)
     return configChain?.name
   }, [walletChain?.name, chainId])
+  const preferredHeaderConnector = useMemo(
+    () => connectors.find((connector) => connector.type === 'injected') ?? connectors[0],
+    [connectors],
+  )
 
   return (
     <main className="page">
@@ -1760,14 +1765,28 @@ function App() {
             '使用同一组输入，横向对比 ethers.js / viem / wagmi 的行为。',
           )}
         </p>
-        <p className="chain-status">
-          {tr(lang, 'Current Chain', '当前链')}:{' '}
-          {isWalletConnected
-            ? currentChainName
-              ? `${currentChainName} (${chainId})`
-              : `${tr(lang, 'Unknown', '未知')} (${chainId})`
-            : tr(lang, 'Wallet not connected', '钱包未连接')}
-        </p>
+        <div className="chain-status-row">
+          <p className="chain-status">
+            {tr(lang, 'Current Chain', '当前链')}:{' '}
+            {isWalletConnected
+              ? currentChainName
+                ? `${currentChainName} (${chainId})`
+                : `${tr(lang, 'Unknown', '未知')} (${chainId})`
+              : tr(lang, 'Wallet not connected', '钱包未连接')}
+          </p>
+          {!isWalletConnected && (
+            <button
+              className="chain-connect-btn"
+              type="button"
+              onClick={() => preferredHeaderConnector && connect({ connector: preferredHeaderConnector })}
+              disabled={!preferredHeaderConnector || isHeaderConnectPending}
+            >
+              {isHeaderConnectPending
+                ? tr(lang, 'Connecting...', '连接中...')
+                : tr(lang, 'Connect Wallet', '连接钱包')}
+            </button>
+          )}
+        </div>
       </header>
       <section className="card page-switch" role="tablist" aria-label="page tabs">
         <button
